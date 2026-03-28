@@ -1,12 +1,1 @@
-feat(TASK-07,08,09,10,11): API routes, auth middleware & Express app
-
-- TASK-07: GET/POST/PUT/PATCH/DELETE /contacts với cursor pagination
-- TASK-08: Lookup by email (O1), by-ud-key (1+N), ud-keys list
-- TASK-09: Bulk import async (job tracking RTDB), export JSON, meta/stats
-- TASK-10: Bearer token auth, SHA-256 hash, expiry check, create-api-key script
-- TASK-11: Express entry point, route mounting, global error handler, /health
-- Files: functions/index.js, functions/routes/contacts.js, functions/routes/lookup.js,
-         functions/routes/bulk.js, functions/routes/meta.js,
-         functions/middleware/auth.js, scripts/create-api-key.js
-
-Task: TASK-07,08,09,10,11 | Status: COMPLETED | Date: 2026-03-28 10:00
+Bổ sung các file task12
