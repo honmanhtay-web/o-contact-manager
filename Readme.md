@@ -2,6 +2,7 @@
 
 > Quản lý danh bạ cá nhân với ~30,000 contacts  
 > Firebase Firestore + Realtime Database + REST API
+> repo-name: o-contact-manager
 
 ---
 
@@ -132,21 +133,21 @@ Tất cả requests cần header: `Authorization: Bearer <api-key>`
 
 ### Endpoints
 
-| Method | Path | Mô tả |
-|--------|------|-------|
-| GET | `/health` | Health check |
-| GET | `/contacts` | Danh sách + search + filter |
-| GET | `/contacts/:id` | Chi tiết 1 contact |
-| POST | `/contacts` | Tạo mới |
-| PUT | `/contacts/:id` | Cập nhật toàn bộ |
-| PATCH | `/contacts/:id` | Cập nhật từng phần |
-| DELETE | `/contacts/:id` | Xóa |
-| GET | `/contacts/by-email/:email` | Lookup theo email |
-| GET | `/contacts/by-ud-key/:key` | Lookup theo userDefined key |
-| GET | `/contacts/ud-keys` | Liệt kê tất cả userDefined keys |
-| POST | `/contacts/bulk/import` | Bulk import (async) |
-| GET | `/contacts/bulk/export` | Export JSON/VCF |
-| GET | `/contacts/meta/stats` | Thống kê tổng |
+| Method | Path                        | Mô tả                           |
+| ------ | --------------------------- | ------------------------------- |
+| GET    | `/health`                   | Health check                    |
+| GET    | `/contacts`                 | Danh sách + search + filter     |
+| GET    | `/contacts/:id`             | Chi tiết 1 contact              |
+| POST   | `/contacts`                 | Tạo mới                         |
+| PUT    | `/contacts/:id`             | Cập nhật toàn bộ                |
+| PATCH  | `/contacts/:id`             | Cập nhật từng phần              |
+| DELETE | `/contacts/:id`             | Xóa                             |
+| GET    | `/contacts/by-email/:email` | Lookup theo email               |
+| GET    | `/contacts/by-ud-key/:key`  | Lookup theo userDefined key     |
+| GET    | `/contacts/ud-keys`         | Liệt kê tất cả userDefined keys |
+| POST   | `/contacts/bulk/import`     | Bulk import (async)             |
+| GET    | `/contacts/bulk/export`     | Export JSON/VCF                 |
+| GET    | `/contacts/meta/stats`      | Thống kê tổng                   |
 
 ### Query params cho GET `/contacts`
 
@@ -169,27 +170,27 @@ Xem ví dụ chi tiết: [`docs/api.http`](docs/api.http)
 
 ## Chi phí Firestore (ước tính)
 
-| Hoạt động | Reads | Ghi chú |
-|-----------|-------|---------|
-| Load trang đầu | 50 | Pagination 50/trang |
-| Tìm kiếm | 50/trang | Dùng searchTokens index |
-| Xem chi tiết | 2 | index + detail |
-| Lookup email | 2 | O(1) |
-| Lookup udKey | 1+N | N = số contacts có key đó |
-| Session 30 phút | ~420 | Trước đây: 30,000/lần load |
+| Hoạt động       | Reads    | Ghi chú                    |
+| --------------- | -------- | -------------------------- |
+| Load trang đầu  | 50       | Pagination 50/trang        |
+| Tìm kiếm        | 50/trang | Dùng searchTokens index    |
+| Xem chi tiết    | 2        | index + detail             |
+| Lookup email    | 2        | O(1)                       |
+| Lookup udKey    | 1+N      | N = số contacts có key đó  |
+| Session 30 phút | ~420     | Trước đây: 30,000/lần load |
 
 ---
 
 ## Trạng thái phát triển
 
-| Nhóm | Tasks | Trạng thái |
-|------|-------|-----------|
-| A — Foundation | TASK-01, 02, 03 | ✅ Hoàn thành |
-| B — Core Utils | TASK-04, 05, 06 | 🔲 Chưa làm |
-| C — API Routes | TASK-07, 08, 09 | 🔲 Chưa làm |
-| D — Middleware | TASK-10, 11 | 🔲 Chưa làm |
-| E — Scripts | TASK-12, 13, 14 | 🔲 Chưa làm |
-| F — Testing & Deploy | TASK-15, 16 | 🔲 Chưa làm |
+| Nhóm                 | Tasks           | Trạng thái    |
+| -------------------- | --------------- | ------------- |
+| A — Foundation       | TASK-01, 02, 03 | ✅ Hoàn thành |
+| B — Core Utils       | TASK-04, 05, 06 | 🔲 Chưa làm   |
+| C — API Routes       | TASK-07, 08, 09 | 🔲 Chưa làm   |
+| D — Middleware       | TASK-10, 11     | 🔲 Chưa làm   |
+| E — Scripts          | TASK-12, 13, 14 | 🔲 Chưa làm   |
+| F — Testing & Deploy | TASK-15, 16     | 🔲 Chưa làm   |
 
 Xem chi tiết: [`project_task.md`](project_task.md)
 
