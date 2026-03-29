@@ -1,9 +1,12 @@
 // Path: src-frontend/src/pages/SearchPage.tsx
 
+import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import { SearchBar } from '@/components/search/SearchBar'
 import { SearchResults } from '@/components/search/SearchResults'
+import { getContactByEmail, getContactsByUdKey } from '@/api/lookup.api'
+import { queryKeys } from '@/constants/queryKeys'
 import { useInfiniteContacts } from '@/hooks/useContacts'
 import { useFilterStore } from '@/store/filter.store'
 import { useDebounce } from '@/hooks/useDebounce'
@@ -22,7 +25,36 @@ export function SearchPage() {
   const { data, isLoading } = useInfiniteContacts(
     debounced.length >= 2 ? { search: debounced } : {}
   )
-  const contacts = data?.contacts ?? []
+  const nameResults = data?.contacts ?? []
+
+  const emailLookup = useQuery({
+    queryKey: queryKeys.emailLookup(debounced),
+    queryFn: async () => {
+      try {
+        return await getContactByEmail(debounced)
+      } catch (error) {
+        if ((error as Error & { status?: number }).status === 404) return null
+        throw error
+      }
+    },
+    enabled: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(debounced),
+    retry: false,
+  })
+
+  const udKeyLookup = useQuery({
+    queryKey: queryKeys.udKeyLookup(debounced),
+    queryFn: async () => {
+      try {
+        const result = await getContactsByUdKey(debounced)
+        return result.data
+      } catch (error) {
+        if ((error as Error & { status?: number }).status === 404) return []
+        throw error
+      }
+    },
+    enabled: debounced.length >= 2 && /[._-]/.test(debounced) && !debounced.includes('@'),
+    retry: false,
+  })
 
   const recentSearches = getRecentSearches()
 
@@ -72,9 +104,13 @@ export function SearchPage() {
           )}
 
           <SearchResults
-            contacts={contacts}
+            nameResults={nameResults}
+            emailResult={emailLookup.data?.contact ?? null}
+            udKeyResults={udKeyLookup.data ?? []}
             query={debounced}
             isLoading={isLoading && debounced.length >= 2}
+            isEmailLoading={emailLookup.isLoading}
+            isUdKeyLoading={udKeyLookup.isLoading}
             onSelect={handleSelect}
           />
         </div>

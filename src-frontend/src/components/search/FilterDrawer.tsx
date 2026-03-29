@@ -1,9 +1,10 @@
 // Path: src-frontend/src/components/search/FilterDrawer.tsx
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Drawer } from '@/components/ui/Drawer'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { useCategories } from '@/hooks/useCategories'
 import { useFilterStore } from '@/store/filter.store'
 import { useUdKeys } from '@/hooks/useStats'
 
@@ -15,6 +16,7 @@ interface FilterDrawerProps {
 export function FilterDrawer({ open, onClose }: FilterDrawerProps) {
   const store = useFilterStore()
   const { data: udKeysData } = useUdKeys()
+  const { data: categories } = useCategories()
 
   // Local draft state — apply on confirm
   const [draft, setDraft] = useState({
@@ -26,6 +28,20 @@ export function FilterDrawer({ open, onClose }: FilterDrawerProps) {
     sort: store.sort,
     order: store.order,
   })
+
+  useEffect(() => {
+    if (!open) return
+
+    setDraft({
+      category: store.category ?? '',
+      domain: store.domain ?? '',
+      email: store.email ?? '',
+      udKey: store.udKey ?? '',
+      hasUD: store.hasUD,
+      sort: store.sort,
+      order: store.order,
+    })
+  }, [open, store.category, store.domain, store.email, store.udKey, store.hasUD, store.sort, store.order])
 
   const handleApply = () => {
     store.setCategory(draft.category || null)
@@ -59,8 +75,8 @@ export function FilterDrawer({ open, onClose }: FilterDrawerProps) {
             className="w-full h-9 rounded-lg border border-divider bg-white px-3 text-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary-300"
           />
           <datalist id="category-list">
-            {['myContacts', 'friends', 'family', 'work', 'starred'].map((c) => (
-              <option key={c} value={c} />
+            {(categories ?? []).map((category) => (
+              <option key={category.name} value={category.name} />
             ))}
           </datalist>
         </div>

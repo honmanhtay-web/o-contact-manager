@@ -1,12 +1,10 @@
 // Path: src-frontend/src/components/layout/BottomNav.tsx
 
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink } from 'react-router-dom'
 import { clsx } from 'clsx'
 import { ROUTES } from '@/constants/routes'
 
 export function BottomNav() {
-  const navigate = useNavigate()
-
   const items = [
     {
       to: ROUTES.home,

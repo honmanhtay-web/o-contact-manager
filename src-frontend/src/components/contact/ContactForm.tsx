@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { EmailFields, PhoneFields, UserDefinedFields } from './ContactFormFields'
+import { useCategories } from '@/hooks/useCategories'
 import { contactFormSchema, type ContactFormValues } from '@/utils/validators'
 import type { ContactWithDetail } from '@/types/contact.types'
 
@@ -15,6 +16,7 @@ interface ContactFormProps {
   onSubmit: (data: ContactFormValues) => void
   onCancel?: () => void
   isLoading?: boolean
+  onDirtyChange?: (dirty: boolean) => void
 }
 
 export function ContactForm({
@@ -23,7 +25,9 @@ export function ContactForm({
   onSubmit,
   onCancel,
   isLoading = false,
+  onDirtyChange,
 }: ContactFormProps) {
+  const { data: categories } = useCategories()
   const {
     register,
     handleSubmit,
@@ -67,6 +71,10 @@ export function ContactForm({
     }
   }, [contact, reset])
 
+  useEffect(() => {
+    onDirtyChange?.(isDirty)
+  }, [isDirty, onDirtyChange])
+
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-5">
       {/* Display Name */}
@@ -87,15 +95,16 @@ export function ContactForm({
       />
 
       {/* Emails */}
-      <EmailFields control={control} errors={errors} />
+      <EmailFields control={control} register={register} errors={errors} />
 
       {/* Phones */}
-      <PhoneFields control={control} />
+      <PhoneFields control={control} register={register} />
 
       {/* Categories */}
       <div className="flex flex-col gap-1">
         <label className="text-label text-on-surface font-medium">Nhóm</label>
         <Input
+          list="contact-category-list"
           placeholder="myContacts, friends, work (cách nhau bằng dấu phẩy)"
           {...register('contact.categories', {
             setValueAs: (v: string | string[]) =>
@@ -104,6 +113,11 @@ export function ContactForm({
                 : v,
           })}
         />
+        <datalist id="contact-category-list">
+          {(categories ?? []).map((category) => (
+            <option key={category.name} value={category.name} />
+          ))}
+        </datalist>
         <p className="text-body-sm text-on-surface-variant">
           Nhập các nhóm cách nhau bằng dấu phẩy
         </p>
@@ -121,7 +135,7 @@ export function ContactForm({
       </div>
 
       {/* UserDefined */}
-      <UserDefinedFields control={control} watch={watch} setValue={setValue} />
+      <UserDefinedFields watch={watch} setValue={setValue} />
 
       {/* Actions */}
       <div className="flex gap-3 justify-end pt-2 border-t border-divider">

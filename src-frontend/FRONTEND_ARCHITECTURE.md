@@ -2,227 +2,249 @@
 # Path: src-frontend/FRONTEND_ARCHITECTURE.md
 
 > React 18 + Vite + TypeScript + TailwindCSS  
-> PWA-ready, Mobile-first, Google Contacts-inspired UI  
-> API: REST → http://localhost:3000
+> PWA-ready, mobile-first, Google Contacts-inspired UI  
+> Verified against the current implementation on 2026-03-29
 
 ---
 
-## 1. Tech Stack
+## 1. Current Status
 
-| Layer | Technology | Lý do |
-|-------|-----------|-------|
-| Framework | React 18 | Component-based, hooks-first |
-| Build | Vite 5 | Fast HMR, ESM native |
-| Language | TypeScript 5 | Type safety, IDE support |
-| Styling | TailwindCSS 3 | Utility-first, mobile-first |
-| State | Zustand | Lightweight, no boilerplate |
-| Data Fetching | TanStack Query v5 | Cache, pagination, optimistic updates |
-| Routing | React Router v6 | SPA routing |
-| Forms | React Hook Form + Zod | Validation, performance |
-| Icons | Lucide React | Consistent icon set |
-| PWA | Vite PWA Plugin | Service worker, manifest |
-| HTTP | Axios | Interceptors, typed responses |
-| Notifications | React Hot Toast | UX feedback |
-| Virtual List | TanStack Virtual | Performance với 30K contacts |
+- `npm run type-check` passes
+- `npm run lint` passes
+- `npm run build` passes
+- `npm run dev` boots successfully
 
 ---
 
-## 2. Cấu trúc thư mục
+## 2. Tech Stack
 
-```
+| Layer | Technology | Notes |
+|-------|------------|-------|
+| UI | React 18 | Function components + hooks |
+| Build | Vite 5 | Fast dev server and production bundling |
+| Language | TypeScript 5 | Strict mode enabled |
+| Styling | TailwindCSS 3 | Custom Google Contacts-inspired palette |
+| Routing | React Router v6 | Protected routes + form leave guards |
+| State | Zustand | Auth, UI, and filters |
+| Data | TanStack Query v5 | Caching, infinite lists, import polling |
+| HTTP | Axios | Auth header + normalized errors |
+| Forms | React Hook Form + Zod | Dynamic email/phone/userDefined fields |
+| PWA | vite-plugin-pwa | Generated manifest + service worker |
+
+---
+
+## 3. Directory Layout
+
+```text
 src-frontend/
 ├── public/
-│   ├── manifest.json              # PWA manifest
-│   ├── icons/                     # App icons (192, 512px)
-│   └── sw.js                      # Service worker (auto-gen by vite-pwa)
-│
+│   ├── icon.svg
+│   ├── icon-mask.svg
+│   ├── manifest.json
+│   └── icons/
+│       ├── icon-192.png
+│       └── icon-512.png
 ├── src/
-│   ├── main.tsx                   # React entry point
-│   ├── App.tsx                    # Root component + Router
-│   ├── vite-env.d.ts              # Vite type declarations
-│   │
-│   ├── api/                       # API layer (pure functions)
-│   │   ├── client.ts              # Axios instance + interceptors
-│   │   ├── contacts.api.ts        # /contacts CRUD endpoints
-│   │   ├── lookup.api.ts          # /by-email, /by-ud-key, /ud-keys
-│   │   ├── bulk.api.ts            # /bulk/import, /bulk/export
-│   │   ├── meta.api.ts            # /meta/stats
-│   │   └── types.ts               # API request/response types
-│   │
-│   ├── types/                     # Domain types (shared)
-│   │   ├── contact.types.ts       # Contact, ContactIndex, ContactDetail
-│   │   ├── pagination.types.ts    # PaginationMeta, CursorPage
-│   │   └── common.types.ts        # ApiResponse, ErrorResponse
-│   │
-│   ├── store/                     # Zustand global state
-│   │   ├── auth.store.ts          # API key, auth status
-│   │   ├── ui.store.ts            # Sidebar, modal, view mode
-│   │   └── filter.store.ts        # Active filters, search query
-│   │
-│   ├── hooks/                     # Custom React hooks
-│   │   ├── useContacts.ts         # TanStack Query: list contacts
-│   │   ├── useContact.ts          # TanStack Query: single contact
-│   │   ├── useContactMutations.ts # create/update/delete mutations
-│   │   ├── useBulkImport.ts       # Bulk import + job polling
-│   │   ├── useStats.ts            # Meta stats
-│   │   ├── useUdKeys.ts           # UserDefined keys list
-│   │   ├── useInfiniteContacts.ts # Infinite scroll pagination
-│   │   └── useDebounce.ts         # Debounce search input
-│   │
-│   ├── components/                # Reusable UI components
-│   │   ├── ui/                    # Base UI primitives
-│   │   │   ├── Button.tsx
-│   │   │   ├── Input.tsx
-│   │   │   ├── Badge.tsx
-│   │   │   ├── Avatar.tsx
-│   │   │   ├── Modal.tsx
-│   │   │   ├── Drawer.tsx
-│   │   │   ├── Dropdown.tsx
-│   │   │   ├── Spinner.tsx
-│   │   │   ├── EmptyState.tsx
-│   │   │   ├── ErrorBoundary.tsx
-│   │   │   └── ConfirmDialog.tsx
-│   │   │
-│   │   ├── layout/                # App shell
-│   │   │   ├── AppShell.tsx       # Root layout (sidebar + content)
-│   │   │   ├── Sidebar.tsx        # Left nav: groups, categories
-│   │   │   ├── TopBar.tsx         # Search bar, action buttons
-│   │   │   ├── BottomNav.tsx      # Mobile bottom navigation
-│   │   │   └── FloatingActionButton.tsx
-│   │   │
-│   │   ├── contact/               # Contact-specific components
-│   │   │   ├── ContactList.tsx    # Virtualized list (A-Z grouped)
-│   │   │   ├── ContactListItem.tsx # Single row in list
-│   │   │   ├── ContactCard.tsx    # Detail view card
-│   │   │   ├── ContactAvatar.tsx  # Avatar with initials fallback
-│   │   │   ├── ContactForm.tsx    # Create/Edit form
-│   │   │   ├── ContactFormFields.tsx # Email/Phone/UD field arrays
-│   │   │   ├── ContactDetail.tsx  # Full detail panel/page
-│   │   │   └── ContactActions.tsx # Edit/Delete/Share actions
-│   │   │
-│   │   ├── search/                # Search & filter components
-│   │   │   ├── SearchBar.tsx      # Global search input
-│   │   │   ├── FilterChips.tsx    # Active filter chips
-│   │   │   ├── FilterDrawer.tsx   # Advanced filter panel
-│   │   │   └── SearchResults.tsx  # Search result list
-│   │   │
-│   │   └── bulk/                  # Bulk operations
-│   │       ├── ImportButton.tsx   # Trigger import
-│   │       ├── ImportProgress.tsx # Job progress indicator
-│   │       └── ExportButton.tsx   # Trigger export
-│   │
-│   ├── pages/                     # Route-level page components
-│   │   ├── ContactsPage.tsx       # / → list all contacts
-│   │   ├── ContactDetailPage.tsx  # /contacts/:id
-│   │   ├── NewContactPage.tsx     # /contacts/new
-│   │   ├── EditContactPage.tsx    # /contacts/:id/edit
-│   │   ├── SearchPage.tsx         # /search?q=...
-│   │   ├── CategoryPage.tsx       # /category/:name
-│   │   ├── UdKeysPage.tsx         # /ud-keys
-│   │   ├── SettingsPage.tsx       # /settings (API key config)
-│   │   └── StatsPage.tsx          # /stats
-│   │
-│   ├── utils/                     # Pure utility functions
-│   │   ├── format.ts              # Name, phone, date formatters
-│   │   ├── avatar.ts              # Generate initials, colors
-│   │   ├── groupContacts.ts       # Group contacts A-Z
-│   │   ├── validators.ts          # Email, phone validation
-│   │   └── storage.ts             # localStorage API key
-│   │
-│   └── constants/                 # App-wide constants
-│       ├── routes.ts              # Route path constants
-│       ├── queryKeys.ts           # TanStack Query key factories
-│       └── config.ts              # API base URL, defaults
-│
+│   ├── api/
+│   │   ├── bulk.api.ts
+│   │   ├── client.ts
+│   │   ├── contacts.api.ts
+│   │   ├── lookup.api.ts
+│   │   ├── meta.api.ts
+│   │   └── types.ts
+│   ├── components/
+│   │   ├── bulk/
+│   │   ├── contact/
+│   │   ├── layout/
+│   │   ├── search/
+│   │   └── ui/
+│   ├── constants/
+│   │   ├── config.ts
+│   │   ├── queryKeys.ts
+│   │   └── routes.ts
+│   ├── hooks/
+│   │   ├── useBulkImport.ts
+│   │   ├── useCategories.ts
+│   │   ├── useContact.ts
+│   │   ├── useContactMutations.ts
+│   │   ├── useContacts.ts
+│   │   ├── useDebounce.ts
+│   │   ├── useInfiniteContacts.ts
+│   │   ├── useStats.ts
+│   │   ├── useUdKeys.ts
+│   │   └── useUnsavedChangesPrompt.ts
+│   ├── pages/
+│   │   ├── CategoryPage.tsx
+│   │   ├── ContactDetailPage.tsx
+│   │   ├── ContactsPage.tsx
+│   │   ├── EditContactPage.tsx
+│   │   ├── NewContactPage.tsx
+│   │   ├── SearchPage.tsx
+│   │   ├── SettingsPage.tsx
+│   │   ├── StatsPage.tsx
+│   │   └── UdKeysPage.tsx
+│   ├── store/
+│   │   ├── auth.store.ts
+│   │   ├── filter.store.ts
+│   │   └── ui.store.ts
+│   ├── types/
+│   │   ├── common.types.ts
+│   │   ├── contact.types.ts
+│   │   └── pagination.types.ts
+│   ├── utils/
+│   │   ├── avatar.ts
+│   │   ├── categories.ts
+│   │   ├── format.ts
+│   │   ├── groupContacts.ts
+│   │   ├── storage.ts
+│   │   ├── validators.ts
+│   │   └── vcf.ts
+│   ├── App.tsx
+│   ├── index.css
+│   ├── main.tsx
+│   └── vite-env.d.ts
+├── .env.example
 ├── index.html
-├── vite.config.ts
+├── package.json
+├── postcss.config.js
 ├── tailwind.config.ts
 ├── tsconfig.json
 ├── tsconfig.node.json
-├── .env.example
-└── package.json
+└── vite.config.ts
 ```
 
 ---
 
-## 3. Data Flow
+## 4. Runtime Flow
 
+```text
+Page
+  -> Hook
+  -> TanStack Query
+  -> API function
+  -> Axios client
+  -> Backend REST API
 ```
-User Action
-    │
-    ▼
-Page/Component
-    │ calls
-    ▼
-Custom Hook (useContacts, useContact...)
-    │ uses
-    ▼
-TanStack Query (cache + loading states)
-    │ calls
-    ▼
-API Function (contacts.api.ts)
-    │ uses
-    ▼
-Axios Client (client.ts) ← API Key from auth.store
-    │
-    ▼
-REST API (localhost:3000)
+
+### Example
+
+```text
+ContactsPage
+  -> useInfiniteContacts()
+  -> getContacts()
+  -> apiClient
+  -> GET /contacts
 ```
 
 ---
 
-## 4. State Management
+## 5. State Model
 
-### Zustand Stores
-- **auth.store**: `{ apiKey, setApiKey, clearApiKey }` — persisted to localStorage
-- **ui.store**: `{ sidebarOpen, viewMode ('list'|'grid'), selectedIds }` — ephemeral
-- **filter.store**: `{ search, category, domain, udKey, hasUD }` — synced with URL params
+### Zustand
 
-### TanStack Query
-- Contacts list: `['contacts', filters]` → infinite scroll
-- Contact detail: `['contacts', id]`
-- Stats: `['stats']`
-- UD Keys: `['udKeys']`
-- Import job: `['importJob', jobId]` → poll every 2s while running
+- `auth.store.ts`
+  - `apiKey`
+  - `isAuthenticated`
+  - persists API key via localStorage helper
+- `ui.store.ts`
+  - `sidebarOpen`
+  - `viewMode` (`list | grid`)
+  - `selectedContactId`
+  - `activePanel`
+- `filter.store.ts`
+  - `search`, `category`, `domain`, `email`, `udKey`, `hasUD`
+  - sort and order
+  - converts state into API params
 
----
+### Query Cache
 
-## 5. PWA Features
-
-- Installable (Add to Home Screen)
-- Offline cache: contact list + static assets
-- Background sync: nếu tạo contact offline → sync khi có mạng
-- App manifest: name, icons, theme color, display: standalone
-
----
-
-## 6. Responsive Design
-
-| Breakpoint | Layout |
-|-----------|--------|
-| mobile (<768px) | Single panel, BottomNav |
-| tablet (768-1024px) | Two-panel (list + detail) |
-| desktop (>1024px) | Three-panel (sidebar + list + detail) |
+- `['contacts', 'list', filters]`
+- `['contacts', 'detail', id]`
+- `['stats']`
+- `['categories']`
+- `['udKeys']`
+- `['emailLookup', email]`
+- `['udKeyLookup', key]`
+- `['importJob', jobId]`
 
 ---
 
-## 7. Google Contacts Feature Parity
+## 6. Implemented Feature Areas
 
-| Feature | Component | Status |
-|---------|-----------|--------|
-| A-Z grouped list | ContactList | TASK-FE-04 |
-| Search (prefix) | SearchBar | TASK-FE-05 |
-| Filter by category | FilterDrawer | TASK-FE-06 |
-| Contact detail view | ContactDetail | TASK-FE-08 |
-| Create contact | NewContactPage | TASK-FE-09 |
-| Edit contact | EditContactPage | TASK-FE-09 |
-| Delete contact | ContactActions | TASK-FE-10 |
-| Multiple emails/phones | ContactFormFields | TASK-FE-09 |
-| UserDefined fields | ContactFormFields | TASK-FE-09 |
-| Import VCF | ImportButton | TASK-FE-11 |
-| Export VCF/JSON | ExportButton | TASK-FE-11 |
-| Lookup by email | SearchPage | TASK-FE-05 |
-| Categories/Groups | CategoryPage | TASK-FE-07 |
-| Stats dashboard | StatsPage | TASK-FE-12 |
-| PWA install | vite-pwa | TASK-FE-13 |
-| Offline support | Service Worker | TASK-FE-13 |
+### Contact Browsing
+
+- Infinite list with cursor pagination
+- A-Z grouping with virtualized rows
+- Grid/list view switching
+- Contact detail side panel on larger screens
+
+### Search
+
+- Debounced live search
+- Grouped result sections:
+  - by name / organization
+  - by exact email lookup
+  - by UD key lookup
+- Recent searches persisted in localStorage
+
+### Forms
+
+- Create and edit flows
+- Dynamic emails, phones, and userDefined fields
+- Zod validation
+- Unsaved-change navigation warning
+
+### Bulk Operations
+
+- JSON import
+- Direct `.vcf` file parsing in the browser before bulk import
+- Import job progress polling
+- JSON / VCF export
+
+### Category Intelligence
+
+- Category summary is derived client-side by paging through contacts
+- Used by sidebar, stats page, filter drawer, and form suggestions
+
+---
+
+## 7. PWA
+
+- Static `public/manifest.json` is available for direct serving
+- `vite-plugin-pwa` also generates the production web manifest and service worker
+- App icons are available in both SVG and PNG form
+- Runtime caching:
+  - network-first for `/contacts` and `/health`
+  - cache-first for Google Fonts assets
+
+---
+
+## 8. Environment & Config
+
+Frontend env vars:
+
+```env
+VITE_API_BASE_URL=http://localhost:3000
+VITE_APP_TITLE=O Contact Manager
+```
+
+Runtime behavior:
+
+- API key is stored in localStorage
+- API base URL override is also stored in localStorage
+- if the backend returns `401`, the app redirects to `/settings`
+
+---
+
+## 9. Known Tradeoffs
+
+- Category breakdown is computed client-side from paginated contacts because the backend does not currently expose a dedicated category stats endpoint.
+- Search by UD key uses heuristic triggering for exact-key lookup, while broad text search remains powered by `/contacts?search=...`.
+
+---
+
+## 10. Recommended Next Backend Enhancements
+
+- Add `/contacts/meta/categories` to avoid client-side category aggregation
+- Add a dedicated search endpoint that can return grouped sections in one round-trip
+- Add richer stats payloads for categories and import history

@@ -1,6 +1,13 @@
 // Path: src-frontend/src/components/contact/ContactFormFields.tsx
 
-import { useFieldArray, type Control } from 'react-hook-form'
+import {
+  useFieldArray,
+  type Control,
+  type FieldErrors,
+  type UseFormRegister,
+  type UseFormSetValue,
+  type UseFormWatch,
+} from 'react-hook-form'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import type { ContactFormValues } from '@/utils/validators'
@@ -8,10 +15,11 @@ import { EMAIL_TYPES, PHONE_TYPES } from '@/constants/config'
 
 interface EmailFieldsProps {
   control: Control<ContactFormValues>
-  errors?: Record<string, unknown>
+  register: UseFormRegister<ContactFormValues>
+  errors?: FieldErrors<ContactFormValues>
 }
 
-export function EmailFields({ control, errors }: EmailFieldsProps) {
+export function EmailFields({ control, register, errors }: EmailFieldsProps) {
   const { fields, append, remove } = useFieldArray({ control, name: 'contact.emails' })
 
   return (
@@ -32,16 +40,13 @@ export function EmailFields({ control, errors }: EmailFieldsProps) {
           <div className="flex-1">
             <Input
               placeholder="email@example.com"
-              {...(control.register(`contact.emails.${index}.value`))}
-              error={
-                (errors as Record<string, { [k: string]: { value?: { message?: string } } }>)
-                  ?.contact?.emails?.[index]?.value?.message
-              }
+              {...register(`contact.emails.${index}.value`)}
+              error={errors?.contact?.emails?.[index]?.value?.message}
             />
           </div>
           <select
             className="h-9 rounded-lg border border-divider bg-white px-2 text-body-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary-300"
-            {...control.register(`contact.emails.${index}.type.0`)}
+            {...register(`contact.emails.${index}.type.0`)}
           >
             {EMAIL_TYPES.map((t) => (
               <option key={t.value} value={t.value}>{t.label}</option>
@@ -66,9 +71,10 @@ export function EmailFields({ control, errors }: EmailFieldsProps) {
 
 interface PhoneFieldsProps {
   control: Control<ContactFormValues>
+  register: UseFormRegister<ContactFormValues>
 }
 
-export function PhoneFields({ control }: PhoneFieldsProps) {
+export function PhoneFields({ control, register }: PhoneFieldsProps) {
   const { fields, append, remove } = useFieldArray({ control, name: 'contact.phones' })
 
   return (
@@ -90,12 +96,12 @@ export function PhoneFields({ control }: PhoneFieldsProps) {
             <Input
               placeholder="0901234567"
               type="tel"
-              {...control.register(`contact.phones.${index}.value`)}
+              {...register(`contact.phones.${index}.value`)}
             />
           </div>
           <select
             className="h-9 rounded-lg border border-divider bg-white px-2 text-body-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary-300"
-            {...control.register(`contact.phones.${index}.type.0`)}
+            {...register(`contact.phones.${index}.type.0`)}
           >
             {PHONE_TYPES.map((t) => (
               <option key={t.value} value={t.value}>{t.label}</option>
@@ -119,12 +125,11 @@ export function PhoneFields({ control }: PhoneFieldsProps) {
 }
 
 interface UserDefinedFieldsProps {
-  control: Control<ContactFormValues>
-  watch: (name: string) => unknown
-  setValue: (name: string, value: unknown) => void
+  watch: UseFormWatch<ContactFormValues>
+  setValue: UseFormSetValue<ContactFormValues>
 }
 
-export function UserDefinedFields({ control, watch, setValue }: UserDefinedFieldsProps) {
+export function UserDefinedFields({ watch, setValue }: UserDefinedFieldsProps) {
   const userDefined = (watch('userDefined') as Record<string, string>) ?? {}
   const entries = Object.entries(userDefined)
 

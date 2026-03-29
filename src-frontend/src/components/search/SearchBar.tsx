@@ -3,8 +3,6 @@
 import { useRef, useEffect } from 'react'
 import { clsx } from 'clsx'
 import { useFilterStore } from '@/store/filter.store'
-import { useDebounce } from '@/hooks/useDebounce'
-import { SEARCH_DEBOUNCE_MS } from '@/constants/config'
 
 interface SearchBarProps {
   autoFocus?: boolean

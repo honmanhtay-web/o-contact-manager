@@ -2,7 +2,7 @@
 
 import axios, { type AxiosInstance, type AxiosError, type InternalAxiosRequestConfig } from 'axios'
 import { API_BASE_URL } from '@/constants/config'
-import { getApiKey } from '@/utils/storage'
+import { getApiBaseUrl, getApiKey, setApiBaseUrl as storeApiBaseUrl } from '@/utils/storage'
 
 /**
  * Axios instance configured for O Contact Manager API.
@@ -14,7 +14,7 @@ import { getApiKey } from '@/utils/storage'
  * - 401 redirect to /settings
  */
 const apiClient: AxiosInstance = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: getApiBaseUrl() ?? API_BASE_URL,
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
@@ -76,5 +76,7 @@ export default apiClient
  * Helper: update base URL at runtime (e.g. when user changes API URL in settings)
  */
 export function setApiBaseUrl(url: string): void {
-  apiClient.defaults.baseURL = url
+  const normalizedUrl = url.trim()
+  storeApiBaseUrl(normalizedUrl)
+  apiClient.defaults.baseURL = normalizedUrl
 }

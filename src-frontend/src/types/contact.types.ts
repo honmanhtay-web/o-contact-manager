@@ -1,14 +1,9 @@
-// Path: src-frontend/src/types/contact.types.ts
-
 /**
  * Email entry matching backend contacts_detail.contact.emails[] schema
  */
 export interface EmailEntry {
-  /** Email type tags e.g. ['INTERNET', 'WORK'] */
   type: string[]
-  /** Email address (lowercase) */
   value: string
-  /** Optional user-readable label */
   label?: string | null
 }
 
@@ -16,9 +11,7 @@ export interface EmailEntry {
  * Phone entry matching backend contacts_detail.contact.phones[] schema
  */
 export interface PhoneEntry {
-  /** Phone type tags e.g. ['CELL'] or ['VOICE', 'WORK'] */
   type: string[]
-  /** Phone number string */
   value: string
 }
 
@@ -33,9 +26,6 @@ export interface NameParts {
   suffix?: string
 }
 
-/**
- * Address entry from vCard ADR property
- */
 export interface AddressEntry {
   type: string[]
   street?: string
@@ -45,10 +35,6 @@ export interface AddressEntry {
   country?: string
 }
 
-/**
- * Contact index document — lightweight, used for list/search/filter views
- * Matches Firestore contacts_index/{contactId} schema
- */
 export interface ContactIndex {
   id: string
   displayName: string
@@ -75,9 +61,6 @@ export interface ContactIndex {
   version: number
 }
 
-/**
- * Contact detail inner object
- */
 export interface ContactDetailInner {
   displayName: string
   name?: NameParts
@@ -91,34 +74,20 @@ export interface ContactDetailInner {
   extensions?: Record<string, string>
 }
 
-/**
- * Contact detail document — full data, fetched on-demand
- * Matches Firestore contacts_detail/{contactId} schema
- */
 export interface ContactDetail {
   id: string
   contact: ContactDetailInner
-  /** userDefined key-value pairs e.g. { 'github.token': 'ghp_...' } */
   userDefined: Record<string, string>
-  /** Raw VCF string if imported from vCard */
   vcfRaw?: string
   createdAt: string
   updatedAt: string
   version: number
 }
 
-/**
- * Combined type: ContactIndex + detail field
- * Returned by GET /contacts/:id
- */
 export interface ContactWithDetail extends ContactIndex {
   detail: ContactDetail | null
 }
 
-/**
- * Form data for creating/updating a contact
- * Mirrors ContactDetail structure but with optional fields for partial updates
- */
 export interface ContactFormData {
   contact: {
     displayName: string
@@ -134,9 +103,6 @@ export interface ContactFormData {
   vcfRaw?: string
 }
 
-/**
- * Email lookup result from GET /contacts/by-email/:email
- */
 export interface EmailLookupResult {
   contactId: string
   email: string
@@ -147,18 +113,12 @@ export interface EmailLookupResult {
   detail: ContactDetail | null
 }
 
-/**
- * UD key entry from GET /contacts/ud-keys
- */
 export interface UdKeyEntry {
   key: string
   count: number
   updatedAt: string | null
 }
 
-/**
- * UD key lookup result from GET /contacts/by-ud-key/:key
- */
 export interface UdKeyLookupResult {
   data: ContactIndex[]
   meta: {
@@ -168,9 +128,6 @@ export interface UdKeyLookupResult {
   }
 }
 
-/**
- * Stats data from GET /contacts/meta/stats
- */
 export interface StatsData {
   totalContacts: number
   totalEmails?: number
@@ -181,9 +138,12 @@ export interface StatsData {
   migratedAt?: string
 }
 
-/**
- * Import job status from Realtime DB (via GET /contacts/bulk/import/:jobId)
- */
+export interface CategorySummary {
+  name: string
+  label: string
+  count: number
+}
+
 export interface ImportJobStatus {
   status: 'running' | 'completed' | 'failed'
   total: number
@@ -193,21 +153,15 @@ export interface ImportJobStatus {
   sourceFile: string | null
   startedAt: string
   finishedAt: string | null
-  error?: string // top-level error if status = 'failed'
+  error?: string
 }
 
-/**
- * Contact write result from POST/PUT/PATCH /contacts
- */
 export interface ContactWriteResult {
   contactId: string
   emailCount?: number
   udKeyCount?: number
 }
 
-/**
- * Bulk import trigger result
- */
 export interface BulkImportResult {
   jobId: string
   statusUrl: string

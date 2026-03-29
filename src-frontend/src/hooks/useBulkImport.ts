@@ -18,7 +18,15 @@ export function useBulkImport() {
     },
   })
 
-  const jobStatus = useQuery({
+  const jobStatus = useImportJobStatus(jobId)
+
+  const reset = () => setJobId(null)
+
+  return { startImport, jobId, jobStatus, reset }
+}
+
+export function useImportJobStatus(jobId: string | null | undefined) {
+  return useQuery({
     queryKey: queryKeys.importJob(jobId ?? ''),
     queryFn: () => getImportJobStatus(jobId!),
     enabled: !!jobId,
@@ -29,8 +37,4 @@ export function useBulkImport() {
       return data.status === 'running' ? JOB_POLL_INTERVAL_MS : false
     },
   })
-
-  const reset = () => setJobId(null)
-
-  return { startImport, jobId, jobStatus, reset }
 }

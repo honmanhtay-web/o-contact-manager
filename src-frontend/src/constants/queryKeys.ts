@@ -32,6 +32,9 @@ export const queryKeys = {
   /** Meta stats */
   stats: ['stats'] as const,
 
+  /** Category breakdown */
+  categories: ['categories'] as const,
+
   /** All userDefined keys */
   udKeys: ['udKeys'] as const,
 

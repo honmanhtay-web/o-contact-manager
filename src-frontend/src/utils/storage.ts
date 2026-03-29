@@ -1,6 +1,11 @@
 // Path: src-frontend/src/utils/storage.ts
 
-import { STORAGE_KEY_API, STORAGE_KEY_RECENT_SEARCHES, MAX_RECENT_SEARCHES } from '@/constants/config'
+import {
+  STORAGE_KEY_API,
+  STORAGE_KEY_API_BASE_URL,
+  STORAGE_KEY_RECENT_SEARCHES,
+  MAX_RECENT_SEARCHES,
+} from '@/constants/config'
 
 /**
  * Get the stored API key from localStorage
@@ -30,6 +35,39 @@ export function setApiKey(key: string): void {
 export function clearApiKey(): void {
   try {
     localStorage.removeItem(STORAGE_KEY_API)
+  } catch {
+    // ignore storage errors
+  }
+}
+
+/**
+ * Get the stored API base URL override
+ */
+export function getApiBaseUrl(): string | null {
+  try {
+    return localStorage.getItem(STORAGE_KEY_API_BASE_URL)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Save API base URL override
+ */
+export function setApiBaseUrl(url: string): void {
+  try {
+    localStorage.setItem(STORAGE_KEY_API_BASE_URL, url)
+  } catch {
+    // ignore storage errors
+  }
+}
+
+/**
+ * Clear stored API base URL override
+ */
+export function clearApiBaseUrl(): void {
+  try {
+    localStorage.removeItem(STORAGE_KEY_API_BASE_URL)
   } catch {
     // ignore storage errors
   }

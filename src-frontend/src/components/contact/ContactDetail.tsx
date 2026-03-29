@@ -1,6 +1,7 @@
 // Path: src-frontend/src/components/contact/ContactDetail.tsx
 
 import { useState } from 'react'
+import toast from 'react-hot-toast'
 import { useNavigate } from 'react-router-dom'
 import { ContactAvatar } from './ContactAvatar'
 import { ContactActions } from './ContactActions'
@@ -8,6 +9,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Spinner } from '@/components/ui/Spinner'
 import { Button } from '@/components/ui/Button'
 import { formatDate, formatPhone } from '@/utils/format'
+import { contactToVcf } from '@/utils/vcf'
 import { ROUTES } from '@/constants/routes'
 import type { ContactWithDetail } from '@/types/contact.types'
 
@@ -75,6 +77,15 @@ export function ContactDetail({ contact, isLoading = false, onClose }: ContactDe
   const toggleUd = (key: string) =>
     setShowUdValues(prev => ({ ...prev, [key]: !prev[key] }))
 
+  const handleShareVcf = async () => {
+    try {
+      await navigator.clipboard.writeText(contactToVcf(contact))
+      toast.success('Đã sao chép vCard vào clipboard')
+    } catch {
+      toast.error('Không thể sao chép vCard')
+    }
+  }
+
   return (
     <div className="flex flex-col h-full bg-white overflow-y-auto">
       {/* Header */}
@@ -91,6 +102,20 @@ export function ContactDetail({ contact, isLoading = false, onClose }: ContactDe
         )}
         <div className="flex-1" />
         <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleShareVcf}
+            icon={
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M4 12v7a1 1 0 001 1h14a1 1 0 001-1v-7" strokeLinecap="round" />
+                <path d="M16 6l-4-4-4 4" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M12 2v14" strokeLinecap="round" />
+              </svg>
+            }
+          >
+            Share
+          </Button>
           <Button
             variant="ghost"
             size="sm"

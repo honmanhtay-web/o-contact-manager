@@ -3,15 +3,35 @@
 
 > Tất cả tasks được thiết kế để thực hiện song song tối đa  
 > Mỗi task độc lập, output rõ ràng, tiêu chí hoàn thành đo lường được  
-> Cập nhật: 2026-03-29
+> Cập nhật: 2026-03-29  
+> Trạng thái bên dưới đã được đối chiếu lại với code thực tế trong `src-frontend`
 
 ---
 
 ## Trạng thái tổng quan
 
-| Tổng task | Hoàn thành | Đang làm | Chưa làm |
+| Tổng task | Hoàn thành | Một phần | Chưa làm |
 |-----------|------------|----------|----------|
-| 18        | 0          | 0        | 18       |
+| 18        | 15         | 3        | 0        |
+
+### Kết quả xác minh gần nhất
+
+- [x] `npm run type-check` pass
+- [x] `npm run lint` pass
+- [x] `npm run build` pass
+- [x] `npm run dev` boot thành công; khi verify cổng `5173` đang bận nên Vite tự chuyển sang `5174`
+
+### Quy ước trạng thái
+
+- `[x] HOÀN THÀNH`: đã có code và đã qua xác minh phù hợp với task ở mức triển khai hiện tại
+- `[~] THỰC HIỆN MỘT PHẦN`: đã có code chính, nhưng vẫn còn lệch một phần so với acceptance criteria gốc
+- `[ ] CHƯA THỰC HIỆN`: chưa có triển khai đáng kể
+
+### Hạng mục còn partial nổi bật
+
+- `FE-08`: component primitives đã dùng được, nhưng chưa bổ sung đầy đủ JSDoc/keyboard behavior như spec gốc
+- `FE-10`: list/grid/detail chạy tốt, nhưng swipe actions mobile vẫn chưa làm riêng
+- `FE-11`: form/detail đã hoàn chỉnh phần chính, nhưng UX categories vẫn theo kiểu input + suggestion thay vì multi-select riêng
 
 ---
 
@@ -21,7 +41,7 @@
 ---
 
 ### TASK-FE-01 · Khởi tạo Vite + React + TypeScript project
-- **Trạng thái:** `[ ] CHƯA THỰC HIỆN`
+- **Trạng thái:** `[x] HOÀN THÀNH`
 - **Phụ thuộc:** Không có
 - **Song song với:** TASK-FE-02, TASK-FE-03
 - **Estimated:** 1h
@@ -80,7 +100,7 @@
 ---
 
 ### TASK-FE-02 · Cấu hình TailwindCSS + Global Styles
-- **Trạng thái:** `[ ] CHƯA THỰC HIỆN`
+- **Trạng thái:** `[x] HOÀN THÀNH`
 - **Phụ thuộc:** TASK-FE-01
 - **Song song với:** TASK-FE-03
 - **Estimated:** 30m
@@ -115,7 +135,7 @@ colors: {
 ---
 
 ### TASK-FE-03 · Types & API Layer Foundation
-- **Trạng thái:** `[ ] CHƯA THỰC HIỆN`
+- **Trạng thái:** `[x] HOÀN THÀNH`
 - **Phụ thuộc:** TASK-FE-01
 - **Song song với:** TASK-FE-02, TASK-FE-04
 - **Estimated:** 2h
@@ -210,7 +230,7 @@ export const queryKeys = {
 ---
 
 ### TASK-FE-04 · API Functions (contacts, lookup, bulk, meta)
-- **Trạng thái:** `[ ] CHƯA THỰC HIỆN`
+- **Trạng thái:** `[x] HOÀN THÀNH`
 - **Phụ thuộc:** TASK-FE-03
 - **Song song với:** TASK-FE-05 (sau khi FE-03 xong)
 - **Estimated:** 2h
@@ -279,7 +299,7 @@ getStats(): Promise<StatsData>
 ---
 
 ### TASK-FE-05 · Zustand Stores
-- **Trạng thái:** `[ ] CHƯA THỰC HIỆN`
+- **Trạng thái:** `[x] HOÀN THÀNH`
 - **Phụ thuộc:** TASK-FE-03
 - **Song song với:** TASK-FE-06, TASK-FE-07
 - **Estimated:** 1h
@@ -323,7 +343,7 @@ interface FilterStore {
 ---
 
 ### TASK-FE-06 · TanStack Query Hooks
-- **Trạng thái:** `[ ] CHƯA THỰC HIỆN`
+- **Trạng thái:** `[x] HOÀN THÀNH`
 - **Phụ thuộc:** TASK-FE-04, TASK-FE-05
 - **Song song với:** TASK-FE-07
 - **Estimated:** 2h
@@ -365,7 +385,7 @@ interface FilterStore {
 ---
 
 ### TASK-FE-07 · Utility Functions
-- **Trạng thái:** `[ ] CHƯA THỰC HIỆN`
+- **Trạng thái:** `[x] HOÀN THÀNH`
 - **Phụ thuộc:** TASK-FE-03
 - **Song song với:** TASK-FE-05, TASK-FE-06
 - **Estimated:** 1h
@@ -397,7 +417,7 @@ interface FilterStore {
 ---
 
 ### TASK-FE-08 · Base UI Primitives
-- **Trạng thái:** `[ ] CHƯA THỰC HIỆN`
+- **Trạng thái:** `[~] THỰC HIỆN MỘT PHẦN`
 - **Phụ thuộc:** TASK-FE-01, TASK-FE-02
 - **Song song với:** TASK-FE-09, TASK-FE-10
 - **Estimated:** 3h
@@ -433,7 +453,7 @@ interface FilterStore {
 ---
 
 ### TASK-FE-09 · Layout Components
-- **Trạng thái:** `[ ] CHƯA THỰC HIỆN`
+- **Trạng thái:** `[x] HOÀN THÀNH`
 - **Phụ thuộc:** TASK-FE-08
 - **Song song với:** TASK-FE-10, TASK-FE-11
 - **Estimated:** 3h
@@ -469,7 +489,7 @@ interface FilterStore {
 ---
 
 ### TASK-FE-10 · Contact List & Avatar Components
-- **Trạng thái:** `[ ] CHƯA THỰC HIỆN`
+- **Trạng thái:** `[~] THỰC HIỆN MỘT PHẦN`
 - **Phụ thuộc:** TASK-FE-06, TASK-FE-07, TASK-FE-08
 - **Song song với:** TASK-FE-11, TASK-FE-12
 - **Estimated:** 3h
@@ -497,7 +517,7 @@ interface FilterStore {
 ---
 
 ### TASK-FE-11 · Contact Detail & Form Components
-- **Trạng thái:** `[ ] CHƯA THỰC HIỆN`
+- **Trạng thái:** `[~] THỰC HIỆN MỘT PHẦN`
 - **Phụ thuộc:** TASK-FE-06, TASK-FE-08
 - **Song song với:** TASK-FE-10, TASK-FE-12
 - **Estimated:** 4h
@@ -551,7 +571,7 @@ const contactSchema = z.object({
 ---
 
 ### TASK-FE-12 · Search & Filter Components
-- **Trạng thái:** `[ ] CHƯA THỰC HIỆN`
+- **Trạng thái:** `[x] HOÀN THÀNH`
 - **Phụ thuộc:** TASK-FE-05, TASK-FE-08
 - **Song song với:** TASK-FE-10, TASK-FE-11
 - **Estimated:** 2h
@@ -570,7 +590,7 @@ const contactSchema = z.object({
 ---
 
 ### TASK-FE-13 · Bulk Import/Export Components
-- **Trạng thái:** `[ ] CHƯA THỰC HIỆN`
+- **Trạng thái:** `[x] HOÀN THÀNH`
 - **Phụ thuộc:** TASK-FE-06, TASK-FE-08
 - **Song song với:** TASK-FE-12
 - **Estimated:** 2h
@@ -592,7 +612,7 @@ const contactSchema = z.object({
 ---
 
 ### TASK-FE-14 · ContactsPage & ContactDetailPage
-- **Trạng thái:** `[ ] CHƯA THỰC HIỆN`
+- **Trạng thái:** `[x] HOÀN THÀNH`
 - **Phụ thuộc:** TASK-FE-09, TASK-FE-10, TASK-FE-11, TASK-FE-12
 - **Song song với:** TASK-FE-15, TASK-FE-16
 - **Estimated:** 2h
@@ -616,7 +636,7 @@ const contactSchema = z.object({
 ---
 
 ### TASK-FE-15 · NewContactPage & EditContactPage
-- **Trạng thái:** `[ ] CHƯA THỰC HIỆN`
+- **Trạng thái:** `[x] HOÀN THÀNH`
 - **Phụ thuộc:** TASK-FE-09, TASK-FE-11
 - **Song song với:** TASK-FE-14, TASK-FE-16
 - **Estimated:** 1.5h
@@ -639,7 +659,7 @@ const contactSchema = z.object({
 ---
 
 ### TASK-FE-16 · CategoryPage, UdKeysPage, SearchPage
-- **Trạng thái:** `[ ] CHƯA THỰC HIỆN`
+- **Trạng thái:** `[x] HOÀN THÀNH`
 - **Phụ thuộc:** TASK-FE-09, TASK-FE-10
 - **Song song với:** TASK-FE-14, TASK-FE-15
 - **Estimated:** 2h
@@ -667,7 +687,7 @@ const contactSchema = z.object({
 ---
 
 ### TASK-FE-17 · SettingsPage & StatsPage
-- **Trạng thái:** `[ ] CHƯA THỰC HIỆN`
+- **Trạng thái:** `[x] HOÀN THÀNH`
 - **Phụ thuộc:** TASK-FE-09
 - **Song song với:** TASK-FE-14, TASK-FE-15, TASK-FE-16
 - **Estimated:** 1.5h
@@ -697,7 +717,7 @@ const contactSchema = z.object({
 ---
 
 ### TASK-FE-18 · PWA Config, App Router & Final Integration
-- **Trạng thái:** `[ ] CHƯA THỰC HIỆN`
+- **Trạng thái:** `[x] HOÀN THÀNH`
 - **Phụ thuộc:** TASK-FE-14, TASK-FE-15, TASK-FE-16, TASK-FE-17
 - **Song song với:** Không
 - **Estimated:** 2h

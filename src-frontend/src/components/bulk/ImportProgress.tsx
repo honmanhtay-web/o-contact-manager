@@ -3,7 +3,7 @@
 import { clsx } from 'clsx'
 import { Spinner } from '@/components/ui/Spinner'
 import { Button } from '@/components/ui/Button'
-import { useBulkImport } from '@/hooks/useBulkImport'
+import { useImportJobStatus } from '@/hooks/useBulkImport'
 
 interface ImportProgressProps {
   jobId: string
@@ -11,7 +11,7 @@ interface ImportProgressProps {
 }
 
 export function ImportProgress({ jobId, onDismiss }: ImportProgressProps) {
-  const { jobStatus } = useBulkImport()
+  const jobStatus = useImportJobStatus(jobId)
   const status = jobStatus.data
 
   if (!status && jobStatus.isLoading) {

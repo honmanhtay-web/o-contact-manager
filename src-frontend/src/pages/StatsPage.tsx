@@ -7,6 +7,7 @@ import { Spinner } from '@/components/ui/Spinner'
 import { ImportButton } from '@/components/bulk/ImportButton'
 import { ExportButton } from '@/components/bulk/ExportButton'
 import { ImportProgress } from '@/components/bulk/ImportProgress'
+import { useCategories } from '@/hooks/useCategories'
 import { useStats } from '@/hooks/useStats'
 import { formatDate } from '@/utils/format'
 import { ROUTES } from '@/constants/routes'
@@ -35,16 +36,10 @@ function StatCard({ label, value, icon, color = 'text-primary' }: StatCardProps)
 
 export function StatsPage() {
   const { data: stats, isLoading, refetch } = useStats()
+  const { data: categories, isLoading: isCategoriesLoading } = useCategories()
   const navigate = useNavigate()
   const [importJobId, setImportJobId] = useState<string | null>(null)
-
-  const categories = [
-    { name: 'myContacts', label: 'Liên hệ của tôi' },
-    { name: 'friends', label: 'Bạn bè' },
-    { name: 'family', label: 'Gia đình' },
-    { name: 'work', label: 'Công việc' },
-    { name: 'starred', label: 'Đã gắn sao' },
-  ]
+  const categoryItems = categories ?? []
 
   return (
     <AppShell>
@@ -71,7 +66,7 @@ export function StatsPage() {
         ) : (
           <>
             {/* Stats cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
               <StatCard
                 label="Tổng liên hệ"
                 value={stats?.totalContacts ?? 0}
@@ -81,6 +76,17 @@ export function StatsPage() {
                     <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" strokeLinecap="round" />
                     <circle cx="9" cy="7" r="4" />
                     <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" strokeLinecap="round" />
+                  </svg>
+                }
+              />
+              <StatCard
+                label="Tổng email"
+                value={stats?.totalEmails ?? 0}
+                color="text-warning"
+                icon={
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" strokeLinecap="round" />
+                    <polyline points="22 6 12 13 2 6" />
                   </svg>
                 }
               />
@@ -126,7 +132,7 @@ export function StatsPage() {
             <div className="bg-white rounded-2xl shadow-card p-4">
               <h3 className="text-title-sm text-on-surface font-medium mb-3">Nhóm liên hệ</h3>
               <div className="space-y-1">
-                {categories.map((cat) => (
+                {categoryItems.map((cat) => (
                   <button
                     key={cat.name}
                     onClick={() => navigate(ROUTES.category(cat.name))}
@@ -139,11 +145,19 @@ export function StatsPage() {
                       </svg>
                     </span>
                     <span className="flex-1 text-body-md text-on-surface">{cat.label}</span>
+                    <span className="shrink-0 text-label bg-primary-50 text-primary rounded-full px-2 py-0.5 min-w-[1.5rem] text-center">
+                      {cat.count}
+                    </span>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-on-surface-variant">
                       <path d="M9 18l6-6-6-6" strokeLinecap="round" />
                     </svg>
                   </button>
                 ))}
+                {!isCategoriesLoading && categoryItems.length === 0 && (
+                  <p className="px-3 py-2 text-body-sm text-on-surface-variant">
+                    Chưa có nhóm liên hệ nào.
+                  </p>
+                )}
               </div>
             </div>
 

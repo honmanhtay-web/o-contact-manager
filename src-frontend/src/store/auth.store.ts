@@ -1,8 +1,7 @@
 // Path: src-frontend/src/store/auth.store.ts
 
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
-import { STORAGE_KEY_API } from '@/constants/config'
+import { clearApiKey, getApiKey, setApiKey as storeApiKey } from '@/utils/storage'
 
 interface AuthState {
   apiKey: string | null
@@ -12,23 +11,21 @@ interface AuthState {
 }
 
 export const useAuthStore = create<AuthState>()(
-  persist(
-    (set) => ({
-      apiKey: null,
-      isAuthenticated: false,
-      setApiKey: (key: string) =>
-        set({ apiKey: key, isAuthenticated: !!key }),
-      clearApiKey: () =>
-        set({ apiKey: null, isAuthenticated: false }),
-    }),
-    {
-      name: STORAGE_KEY_API,
-      partialize: (state) => ({ apiKey: state.apiKey }),
-      onRehydrateStorage: () => (state) => {
-        if (state) {
-          state.isAuthenticated = !!state.apiKey
-        }
+  (set) => {
+    const apiKey = getApiKey()
+
+    return {
+      apiKey,
+      isAuthenticated: !!apiKey,
+      setApiKey: (key: string) => {
+        const normalizedKey = key.trim()
+        storeApiKey(normalizedKey)
+        set({ apiKey: normalizedKey, isAuthenticated: !!normalizedKey })
+      },
+      clearApiKey: () => {
+        clearApiKey()
+        set({ apiKey: null, isAuthenticated: false })
       },
     }
-  )
+  }
 )

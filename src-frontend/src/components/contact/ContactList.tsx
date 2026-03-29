@@ -52,16 +52,16 @@ export function ContactList({
     estimateSize: (i) => (rows[i]?.type === 'header' ? 32 : 72),
     overscan: 5,
   })
+  const virtualItems = virtualizer.getVirtualItems()
 
   // Infinite scroll trigger
   useEffect(() => {
-    const items = virtualizer.getVirtualItems()
-    if (!items.length) return
-    const lastItem = items[items.length - 1]
+    if (!virtualItems.length) return
+    const lastItem = virtualItems[virtualItems.length - 1]
     if (lastItem.index >= rows.length - 1 && hasNextPage && !isFetchingNextPage) {
       fetchNextPage?.()
     }
-  }, [virtualizer.getVirtualItems(), rows.length, hasNextPage, isFetchingNextPage, fetchNextPage])
+  }, [virtualItems, rows.length, hasNextPage, isFetchingNextPage, fetchNextPage])
 
   if (isLoading) {
     return (
@@ -101,7 +101,7 @@ export function ContactList({
         style={{ height: virtualizer.getTotalSize() }}
         className="relative"
       >
-        {virtualizer.getVirtualItems().map((virtualRow) => {
+        {virtualItems.map((virtualRow) => {
           const row = rows[virtualRow.index]
           return (
             <div

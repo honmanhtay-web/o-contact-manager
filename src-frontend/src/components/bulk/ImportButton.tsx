@@ -5,6 +5,7 @@ import toast from 'react-hot-toast'
 import { Button } from '@/components/ui/Button'
 import { useBulkImport } from '@/hooks/useBulkImport'
 import type { ContactFormData } from '@/types/contact.types'
+import { parseVcfContacts } from '@/utils/vcf'
 
 interface ImportButtonProps {
   onJobStarted?: (jobId: string) => void
@@ -31,11 +32,10 @@ export function ImportButton({ onJobStarted }: ImportButtonProps) {
 
       if (file.name.endsWith('.json')) {
         contacts = await parseJsonContacts(text)
+      } else if (file.name.endsWith('.vcf')) {
+        contacts = parseVcfContacts(text)
       } else {
-        // VCF: gọi server import trực tiếp với raw data
-        // Đơn giản: chuyển thành 1 contact cho mỗi BEGIN:VCARD block
-        // Server-side xử lý parse VCF qua bulk import API
-        toast.error('VCF import: Upload file JSON đã parse hoặc dùng CLI import script')
+        toast.error('Định dạng file chưa được hỗ trợ')
         return
       }
 
@@ -71,7 +71,7 @@ export function ImportButton({ onJobStarted }: ImportButtonProps) {
       <input
         ref={fileRef}
         type="file"
-        accept=".json"
+        accept=".json,.vcf"
         className="hidden"
         onChange={handleFile}
       />

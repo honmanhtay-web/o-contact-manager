@@ -1,5 +1,7 @@
 // Path: src-frontend/src/constants/config.ts
 
+import packageJson from '../../package.json'
+
 /**
  * Application configuration constants.
  * VITE_ prefixed env vars are exposed to client by Vite.
@@ -10,6 +12,9 @@ export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localho
 
 /** App display name */
 export const APP_NAME = import.meta.env.VITE_APP_TITLE ?? 'O Contacts'
+
+/** App version */
+export const APP_VERSION = packageJson.version ?? '1.0.0'
 
 /** Default contacts per page */
 export const DEFAULT_PAGE_SIZE = 50
@@ -25,6 +30,9 @@ export const JOB_POLL_INTERVAL_MS = 2000
 
 /** localStorage key for API key */
 export const STORAGE_KEY_API = 'o-contact-api-key'
+
+/** localStorage key for API base URL override */
+export const STORAGE_KEY_API_BASE_URL = 'o-contact-api-base-url'
 
 /** localStorage key for recent searches */
 export const STORAGE_KEY_RECENT_SEARCHES = 'o-contact-recent-searches'

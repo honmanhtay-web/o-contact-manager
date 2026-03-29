@@ -4,17 +4,17 @@ import { useState } from 'react'
 import toast from 'react-hot-toast'
 import { AppShell } from '@/components/layout/AppShell'
 import { TopBar } from '@/components/layout/TopBar'
-import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { useAuthStore } from '@/store/auth.store'
 import { setApiBaseUrl } from '@/api/client'
-import { API_BASE_URL, APP_NAME } from '@/constants/config'
+import { API_BASE_URL, APP_NAME, APP_VERSION } from '@/constants/config'
+import { getApiBaseUrl } from '@/utils/storage'
 
 export function SettingsPage() {
   const { apiKey, setApiKey, clearApiKey } = useAuthStore()
   const [keyInput, setKeyInput] = useState(apiKey ?? '')
   const [showKey, setShowKey] = useState(false)
-  const [baseUrl, setBaseUrl] = useState(API_BASE_URL)
+  const [baseUrl, setBaseUrl] = useState(getApiBaseUrl() ?? API_BASE_URL)
   const [testing, setTesting] = useState(false)
 
   const handleSave = () => {
@@ -157,6 +157,7 @@ export function SettingsPage() {
           <section className="bg-white rounded-2xl shadow-card p-5 space-y-1 text-body-sm text-on-surface-variant">
             <h2 className="text-title-md text-on-surface font-medium mb-2">Thông tin</h2>
             <p>📱 {APP_NAME}</p>
+            <p>🏷️ Version: {APP_VERSION}</p>
             <p>🔗 API: <span className="font-mono">{baseUrl}</span></p>
             <p>⚡ React 18 + Vite + TailwindCSS</p>
             <p>📦 Firebase Firestore + Realtime DB</p>

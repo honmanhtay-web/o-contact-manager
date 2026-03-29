@@ -3,6 +3,7 @@
 import apiClient from './client'
 import type { ContactWithDetail, ContactFormData, ContactWriteResult } from '@/types/contact.types'
 import type { ContactsPage, ContactsFilterParams } from '@/types/pagination.types'
+import type { ApiEnvelope } from './types'
 
 /**
  * List contacts with optional filters + cursor pagination
@@ -16,7 +17,7 @@ export async function getContacts(params: ContactsFilterParams = {}): Promise<Co
  * Get a single contact (index + detail merged)
  */
 export async function getContact(id: string): Promise<ContactWithDetail> {
-  const { data } = await apiClient.get<{ data: ContactWithDetail }>(`/contacts/${id}`)
+  const { data } = await apiClient.get<ApiEnvelope<ContactWithDetail>>(`/contacts/${id}`)
   return data.data
 }
 
@@ -24,7 +25,7 @@ export async function getContact(id: string): Promise<ContactWithDetail> {
  * Create a new contact
  */
 export async function createContact(body: ContactFormData): Promise<ContactWriteResult> {
-  const { data } = await apiClient.post<{ data: ContactWriteResult; meta: ContactWriteResult }>('/contacts', body)
+  const { data } = await apiClient.post<ApiEnvelope<ContactWriteResult, ContactWriteResult>>('/contacts', body)
   return { ...data.data, ...data.meta }
 }
 
@@ -32,7 +33,7 @@ export async function createContact(body: ContactFormData): Promise<ContactWrite
  * Full replace (PUT)
  */
 export async function updateContact(id: string, body: ContactFormData): Promise<ContactWriteResult> {
-  const { data } = await apiClient.put<{ data: ContactWriteResult; meta: ContactWriteResult }>(`/contacts/${id}`, body)
+  const { data } = await apiClient.put<ApiEnvelope<ContactWriteResult, ContactWriteResult>>(`/contacts/${id}`, body)
   return { ...data.data, ...data.meta }
 }
 
@@ -40,7 +41,7 @@ export async function updateContact(id: string, body: ContactFormData): Promise<
  * Partial update (PATCH)
  */
 export async function patchContact(id: string, body: Partial<ContactFormData>): Promise<ContactWriteResult> {
-  const { data } = await apiClient.patch<{ data: ContactWriteResult; meta: ContactWriteResult }>(`/contacts/${id}`, body)
+  const { data } = await apiClient.patch<ApiEnvelope<ContactWriteResult, ContactWriteResult>>(`/contacts/${id}`, body)
   return { ...data.data, ...data.meta }
 }
 
@@ -48,6 +49,16 @@ export async function patchContact(id: string, body: Partial<ContactFormData>): 
  * Delete a contact
  */
 export async function deleteContact(id: string): Promise<{ contactId: string; deletedEmails: number; cleanedUdKeys: number }> {
-  const { data } = await apiClient.delete<{ data: { contactId: string; deletedEmails: number; cleanedUdKeys: number } }>(`/contacts/${id}`)
-  return data.data
+  const { data } = await apiClient.delete<
+    ApiEnvelope<
+      { contactId: string },
+      { deletedEmails: number; cleanedUdKeys: number }
+    >
+  >(`/contacts/${id}`)
+
+  return {
+    contactId: data.data.contactId,
+    deletedEmails: data.meta?.deletedEmails ?? 0,
+    cleanedUdKeys: data.meta?.cleanedUdKeys ?? 0,
+  }
 }

@@ -1,5 +1,6 @@
 // Path: src-frontend/src/pages/EditContactPage.tsx
 
+import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import { TopBar } from '@/components/layout/TopBar'
@@ -8,6 +9,7 @@ import { Spinner } from '@/components/ui/Spinner'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { useContact } from '@/hooks/useContact'
 import { useContactMutations } from '@/hooks/useContactMutations'
+import { useUnsavedChangesPrompt } from '@/hooks/useUnsavedChangesPrompt'
 import { ROUTES } from '@/constants/routes'
 import type { ContactFormValues } from '@/utils/validators'
 
@@ -16,6 +18,9 @@ export function EditContactPage() {
   const navigate = useNavigate()
   const { data: contact, isLoading, isError } = useContact(id)
   const { update } = useContactMutations()
+  const [isDirty, setIsDirty] = useState(false)
+
+  useUnsavedChangesPrompt(isDirty && !update.isPending)
 
   const handleSubmit = (data: ContactFormValues) => {
     if (!id) return
@@ -54,6 +59,7 @@ export function EditContactPage() {
           onSubmit={handleSubmit}
           onCancel={() => navigate(ROUTES.contactDetail(id!))}
           isLoading={update.isPending}
+          onDirtyChange={setIsDirty}
         />
       </div>
     </AppShell>

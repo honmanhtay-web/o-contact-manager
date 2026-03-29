@@ -1,8 +1,9 @@
 // Path: src-frontend/src/components/layout/Sidebar.tsx
 
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink } from 'react-router-dom'
 import { clsx } from 'clsx'
 import { ROUTES } from '@/constants/routes'
+import { useCategories } from '@/hooks/useCategories'
 import { useUIStore } from '@/store/ui.store'
 import { useFilterStore } from '@/store/filter.store'
 import { useStats } from '@/hooks/useStats'
@@ -45,18 +46,10 @@ export function Sidebar() {
   const setSidebarOpen = useUIStore((s) => s.setSidebarOpen)
   const setCategory = useFilterStore((s) => s.setCategory)
   const resetFilters = useFilterStore((s) => s.resetFilters)
-  const navigate = useNavigate()
   const { data: stats } = useStats()
+  const { data: categories } = useCategories()
 
   if (!sidebarOpen) return null
-
-  const categories = [
-    { name: 'myContacts', label: 'Liên hệ của tôi' },
-    { name: 'friends', label: 'Bạn bè' },
-    { name: 'family', label: 'Gia đình' },
-    { name: 'work', label: 'Công việc' },
-    { name: 'starred', label: 'Đã gắn sao' },
-  ]
 
   return (
     <aside className="flex flex-col h-full bg-white border-r border-divider w-64 shrink-0">
@@ -99,7 +92,7 @@ export function Sidebar() {
         <div className="pt-3 pb-1">
           <p className="text-label text-on-surface-variant/70 px-3 mb-1 uppercase tracking-wider">Nhóm</p>
         </div>
-        {categories.map((cat) => (
+        {(categories ?? []).map((cat) => (
           <NavItem
             key={cat.name}
             to={ROUTES.category(cat.name)}
@@ -111,6 +104,7 @@ export function Sidebar() {
               </svg>
             }
             label={cat.label}
+            count={cat.count}
           />
         ))}
 

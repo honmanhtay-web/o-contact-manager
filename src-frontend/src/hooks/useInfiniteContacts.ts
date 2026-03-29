@@ -1,0 +1,1 @@
+export { useInfiniteContacts } from './useContacts'
