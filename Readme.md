@@ -13,9 +13,9 @@
 - 📧 Tìm kiếm theo bất kỳ email nào (primary hoặc phụ)
 - 🔑 Lưu trữ & tìm kiếm theo userDefined keys (2FA secrets, tokens,...)
 - 🏷️ Phân loại theo categories/tags
-- 📥 Import hàng loạt (async, có job tracking)
-- 📤 Export JSON
-- 🔒 API Key authentication (SHA-256 hash, expiry, revoke)
+- 📥 Import từ VCF (vCard 3.0/4.0)
+- 📤 Export JSON/VCF
+- 🔒 API Key authentication (SHA-256 hash, không lưu key gốc)
 - 💰 Tối ưu Firestore quota (50 reads/page thay vì 30,000)
 
 ---
@@ -90,14 +90,10 @@ npm run deploy:rules
 ### 5. Tạo API key đầu tiên
 
 ```bash
-node scripts/create-api-key.js --name "My App"
-# → In ra API key, lưu lại để dùng trong header Authorization
-
-# Xem tất cả keys:
-node scripts/create-api-key.js --list
-
-# Thu hồi key:
-node scripts/create-api-key.js --revoke <keyHash>
+node scripts/create-api-key.js
+# Hoặc:
+npm run create-key
+# → In ra API key — copy ngay, không hiển thị lại
 ```
 
 ### 6. Chạy server
@@ -117,15 +113,17 @@ Server chạy tại: `http://localhost:3000`
 ## Import Contacts
 
 ```bash
-# Import hàng loạt qua API (async)
-curl -X POST http://localhost:3000/contacts/bulk/import \
-  -H "Authorization: Bearer <api-key>" \
-  -H "Content-Type: application/json" \
-  -d '{"contacts": [...]}'
+# Import từ file VCF
+npm run import -- --file contacts_export.vcf
 
-# Poll trạng thái job
-curl http://localhost:3000/contacts/bulk/import/<jobId> \
-  -H "Authorization: Bearer <api-key>"
+# Import từ file JSON
+npm run import -- --file contacts.json --concurrency 10
+
+# Migration nếu đã có data cũ (chạy 1 lần)
+npm run migrate
+
+# Dry-run migration (không ghi)
+node scripts/migrate-v2.js --dry-run
 ```
 
 ---
@@ -136,22 +134,22 @@ Tất cả requests cần header: `Authorization: Bearer <api-key>`
 
 ### Endpoints
 
-| Method | Path | Mô tả |
-| ------ | ---- | ----- |
-| GET | `/health` | Health check (public) |
-| GET | `/contacts` | Danh sách + search + filter |
-| GET | `/contacts/:id` | Chi tiết 1 contact |
-| POST | `/contacts` | Tạo mới |
-| PUT | `/contacts/:id` | Cập nhật toàn bộ |
-| PATCH | `/contacts/:id` | Cập nhật từng phần |
-| DELETE | `/contacts/:id` | Xóa |
-| GET | `/contacts/by-email/:email` | Lookup theo email |
-| GET | `/contacts/by-ud-key/:key` | Lookup theo userDefined key |
-| GET | `/contacts/ud-keys` | Liệt kê tất cả userDefined keys |
-| POST | `/contacts/bulk/import` | Bulk import (async) |
-| GET | `/contacts/bulk/import/:jobId` | Kiểm tra trạng thái import |
-| GET | `/contacts/bulk/export` | Export JSON |
-| GET | `/contacts/meta/stats` | Thống kê tổng |
+| Method | Path                              | Mô tả                           |
+| ------ | --------------------------------- | ------------------------------- |
+| GET    | `/health`                         | Health check (không cần auth)   |
+| GET    | `/contacts`                       | Danh sách + search + filter     |
+| GET    | `/contacts/:id`                   | Chi tiết 1 contact              |
+| POST   | `/contacts`                       | Tạo mới                         |
+| PUT    | `/contacts/:id`                   | Cập nhật toàn bộ                |
+| PATCH  | `/contacts/:id`                   | Cập nhật từng phần              |
+| DELETE | `/contacts/:id`                   | Xóa                             |
+| GET    | `/contacts/by-email/:email`       | Lookup theo email               |
+| GET    | `/contacts/by-ud-key/:key`        | Lookup theo userDefined key     |
+| GET    | `/contacts/ud-keys`               | Liệt kê tất cả userDefined keys |
+| POST   | `/contacts/bulk/import`           | Bulk import async (→ jobId)     |
+| GET    | `/contacts/bulk/import/:jobId`    | Trạng thái import job           |
+| GET    | `/contacts/bulk/export`           | Export JSON/VCF                 |
+| GET    | `/contacts/meta/stats`            | Thống kê tổng                   |
 
 ### Query params cho GET `/contacts`
 
@@ -168,60 +166,84 @@ limit       number   default 50, max 200
 cursor      string   cursor để phân trang
 ```
 
-### Ví dụ curl
+Xem ví dụ chi tiết: [`docs/api.http`](docs/api.http)
 
-```bash
-BASE=http://localhost:3000
-KEY="cm_your_api_key_here"
+---
 
-# Danh sách
-curl "$BASE/contacts?limit=20" -H "Authorization: Bearer $KEY"
+## Format dữ liệu contact
 
-# Tìm kiếm
-curl "$BASE/contacts?search=nguyen" -H "Authorization: Bearer $KEY"
-
-# Lookup theo email
-curl "$BASE/contacts/by-email/john@gmail.com" -H "Authorization: Bearer $KEY"
-
-# Tạo contact
-curl -X POST "$BASE/contacts" \
-  -H "Authorization: Bearer $KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"contact":{"displayName":"John Doe","emails":[{"value":"john@example.com"}]}}'
-
-# Xóa
-curl -X DELETE "$BASE/contacts/uid_abc123" -H "Authorization: Bearer $KEY"
-
-# Stats
-curl "$BASE/contacts/meta/stats" -H "Authorization: Bearer $KEY"
+```json
+{
+  "contact": {
+    "displayName": "Nguyen Van An",
+    "emails": [
+      { "type": ["INTERNET", "WORK"], "value": "an@company.com" },
+      { "type": ["INTERNET", "HOME"], "value": "an@gmail.com" }
+    ],
+    "phones": [{ "type": ["CELL"], "value": "0901234567" }],
+    "organization": "ACME Corp",
+    "categories": ["myContacts"]
+  },
+  "userDefined": {
+    "github.token": "ghp_xxx",
+    "2fa.secret": "JBSWY3DPEHPK3PXP"
+  }
+}
 ```
 
 ---
 
 ## Chi phí Firestore (ước tính)
 
-| Hoạt động | Reads | Ghi chú |
-| --------- | ----- | ------- |
-| Load trang đầu | 50 | Pagination 50/trang |
-| Tìm kiếm | 50/trang | Dùng searchTokens index |
-| Xem chi tiết | 2 | index + detail |
-| Lookup email | 3 | O(1) |
-| Session 30 phút | ~420 | Trước đây: 30,000/lần load |
+| Hoạt động       | Reads    | Ghi chú                    |
+| --------------- | -------- | -------------------------- |
+| Load trang đầu  | 50       | Pagination 50/trang        |
+| Tìm kiếm        | 50/trang | Dùng searchTokens index    |
+| Xem chi tiết    | 2        | index + detail             |
+| Lookup email    | 3        | O(1)                       |
+| Lookup udKey    | 1+N      | N = số contacts có key đó  |
+| Session 30 phút | ~420     | Trước đây: 30,000/lần load |
 
 ---
 
 ## Trạng thái phát triển
 
-| Nhóm | Tasks | Trạng thái |
-| ---- | ----- | ---------- |
-| A — Foundation | TASK-01, 02, 03 | ✅ Hoàn thành |
-| B — Core Utils | TASK-04, 05, 06 | ✅ Hoàn thành |
-| C — API Routes | TASK-07, 08, 09 | ✅ Hoàn thành |
-| D — Middleware | TASK-10, 11 | ✅ Hoàn thành |
-| E — Scripts | TASK-12, 13, 14 | 🔲 Chưa làm |
-| F — Testing & Deploy | TASK-15, 16 | 🔲 Chưa làm |
+| Nhóm                 | Tasks           | Trạng thái    |
+| -------------------- | --------------- | ------------- |
+| A — Foundation       | TASK-01, 02, 03 | ✅ Hoàn thành |
+| B — Core Utils       | TASK-04, 05, 06 | ✅ Hoàn thành |
+| C — API Routes       | TASK-07, 08, 09 | ✅ Hoàn thành |
+| D — Middleware       | TASK-10, 11     | ✅ Hoàn thành |
+| E — Scripts          | TASK-12, 13, 14 | ✅ Hoàn thành |
+| F — Testing & Deploy | TASK-15, 16     | ✅ Hoàn thành      |
 
 Xem chi tiết: [`project_task.md`](project_task.md)
+
+---
+
+## Deploy Production
+
+Xem hướng dẫn đầy đủ: [`docs/deployment-guide.md`](docs/deployment-guide.md)
+
+Quick start (self-hosted với PM2):
+
+```bash
+# 1. Deploy rules & indexes lên Firebase
+npm run deploy:rules
+
+# 2. Tạo API key đầu tiên
+npm run create-key
+
+# 3. Import contacts (nếu có)
+npm run import -- --file contacts.vcf
+
+# 4. Khởi động với PM2
+pm2 start ecosystem.config.js
+pm2 save && pm2 startup
+
+# 5. Kiểm tra hệ thống
+npm run health -- --key YOUR_API_KEY
+```
 
 ---
 

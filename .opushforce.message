@@ -1,1 +1,10 @@
-Bổ sung các file task12
+feat(TASK-16): deploy guide, health-check, PM2 config — project complete 16/16
+
+- docs/deployment-guide.md: hướng dẫn self-hosted (PM2) + Cloud Functions, nginx, SSL, troubleshooting
+- scripts/health-check.js: CI-friendly checker (6 checks, exit code 1 nếu fail)
+- ecosystem.config.js: PM2 production config với autorestart, log paths, graceful shutdown
+- package.json: thêm script "health"
+- Readme.md: deploy quick-start 5 lệnh + link deployment-guide
+- Files: docs/deployment-guide.md, scripts/health-check.js, ecosystem.config.js
+
+Task: TASK-16 | Status: COMPLETED | Date: 2026-03-28 | ALL 16/16 TASKS DONE ✅

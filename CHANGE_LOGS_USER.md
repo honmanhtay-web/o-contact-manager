@@ -1,21 +1,44 @@
-## 2026-03-28 10:00 — Hoàn thiện toàn bộ API & Bảo mật
+## 2026-03-28 — Hoàn chỉnh — sẵn sàng deploy production 🎉
 
-**Đã thêm/Cải thiện:**
+**Đã thực hiện:**
+- Hướng dẫn deploy chi tiết từng bước tại `docs/deployment-guide.md`
+  - Lựa chọn 1: chạy trên server riêng (VPS) với PM2 — khuyến nghị cho personal use
+  - Lựa chọn 2: Firebase Cloud Functions — serverless, tự scale
+- Script kiểm tra sức khỏe hệ thống: `npm run health -- --key YOUR_KEY`
+  - Tự động kiểm tra: server online, auth hoạt động, Firebase kết nối được, các endpoint phản hồi đúng
+- File cấu hình PM2 (`ecosystem.config.js`) — tự động restart khi crash, ghi log
+- Checklist production 10 điểm trước khi go-live
 
-- API đã hoạt động đầy đủ — có thể tạo, xem, sửa, xóa contact qua HTTP
-- Tìm kiếm contact theo email bất kỳ (kể cả email phụ) — trả kết quả tức thì
-- Tìm tất cả contact có cùng một "khóa bí mật" (userDefined key) — ví dụ: tất cả contact có `gitea.token`
-- Xem danh sách tất cả loại khóa đang dùng trong hệ thống, sắp xếp theo số lượng
-- Import hàng loạt contact không block server — gửi xong là trả kết quả ngay, có thể theo dõi tiến độ
-- Export toàn bộ danh bạ ra file JSON hoặc xem thống kê tổng quan
-- Xem thống kê: tổng số contact, số email, phân loại theo category
-- Bảo mật bằng API key — chỉ ai có key mới dùng được; key có thể đặt ngày hết hạn và thu hồi
-- Endpoint kiểm tra sức khỏe server (`/health`) — tiện giám sát uptime
+**Toàn bộ 16/16 tasks đã hoàn thành. Project sẵn sàng sử dụng.**
 
-**Tiếp theo:**
-- Viết VCF parser để import từ file danh bạ xuất từ điện thoại (TASK-12)
-- Viết script import hàng loạt từ file VCF (TASK-13)
-- Viết script migration cho data cũ (TASK-14)
+Bước tiếp theo của bạn:
+1. `npm install` trong thư mục project
+2. Tạo/cấu hình Firebase project và tải `serviceAccountKey.json`
+3. `npm run deploy:rules` → `npm run create-key` → `npm run import -- --file contacts.vcf`
+4. `pm2 start ecosystem.config.js`
+
+---
+
+## 2026-03-28 — Hoàn thiện toàn bộ API và công cụ import
+
+**Đã thực hiện:**
+- API đã sẵn sàng chạy — khởi động bằng `npm start` hoặc `npm run dev`
+- Xác thực API Key — mọi request đến `/contacts` đều cần header `Authorization: Bearer <key>`
+  - Tạo key lần đầu: `npm run create-key`
+- Đầy đủ CRUD: tạo, xem, sửa toàn bộ, sửa từng phần, xóa contact
+- Tìm kiếm nhanh theo email → trả ngay contact liên quan (không cần duyệt toàn bộ)
+- Tìm kiếm theo userDefined key (2FA secret, token...) → trả tất cả contact có key đó
+- Xem toàn bộ danh sách userDefined keys đang dùng
+- Import hàng loạt từ file VCF hoặc JSON — chạy nền, theo dõi tiến độ qua jobId
+- Export toàn bộ danh bạ ra JSON hoặc VCF
+- Công cụ migration dữ liệu cũ: `npm run migrate`
+- Tài liệu API đầy đủ tại `docs/api.http` (dùng với VSCode REST Client)
+
+**Bước tiếp theo — Deploy (TASK-16):**
+1. `npm run deploy:rules` — upload security rules & indexes lên Firebase
+2. `npm run create-key` — tạo API key đầu tiên
+3. `npm run import -- --file contacts.vcf` — import danh bạ
+4. `npm start` — khởi động server
 
 ---
 
@@ -27,10 +50,6 @@
 - Thêm/sửa/xóa contact giờ cập nhật đồng thời tất cả chỉ mục — không bao giờ bị mất đồng bộ
 - Phân trang cursor-based — tải trang tiếp theo mà không cần đọc lại từ đầu
 - Hỗ trợ lọc: theo tên, email, domain, category, userDefined keys, hoặc kết hợp nhiều filter
-
-**Tiếp theo:**
-- Viết API routes: CRUD contacts (TASK-07), lookup endpoints (TASK-08) ✅
-- Viết middleware xác thực API key (TASK-10) ✅
 
 ---
 

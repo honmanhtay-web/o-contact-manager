@@ -1,282 +1,135 @@
 #!/usr/bin/env node
-"use strict";
+'use strict';
 
 /**
  * scripts/import.js — Bulk import contacts từ VCF file vào Firestore
  *
  * Usage:
  *   node scripts/import.js --file contacts.vcf
- *   node scripts/import.js --file contacts.vcf --dry-run
  *   node scripts/import.js --file contacts.vcf --concurrency 10
- *   node scripts/import.js --file contacts.vcf --source "google_export_2026.vcf"
- *   node scripts/import.js --file contacts.json  (JSON array format)
- *
- * JSON format:
- *   [ { contact: {...}, userDefined: {...} }, ... ]
- *   hoặc [ { displayName, emails: [...], ... }, ... ]  (flat format)
+ *   node scripts/import.js --file contacts.json   (JSON array)
  */
 
-require("dotenv").config();
+require('dotenv').config();
 
-const fs = require("fs");
-const path = require("path");
-const crypto = require("crypto");
+const fs = require('fs');
+const path = require('path');
+const { parseVcfFile } = require('./vcf2json');
+const { bulkWriteContacts } = require('../functions/utils/writeContact');
+const { getFirestore, FieldValue } = require('../functions/utils/firebase-admin');
 
-const { parseVcfFile } = require("./vcf2json");
-const { writeContact } = require("../functions/utils/writeContact");
-const { getFirestore, getRtdb, FieldValue } = require("../functions/utils/firebase-admin");
+// ─── Parse CLI args ──────────────────────────────────────────────────────────
+const args = process.argv.slice(2);
+let inputFile = null;
+let concurrency = 5;
 
-// ─── CLI Args ─────────────────────────────────────────────────────────────────
-
-function parseArgs(argv) {
-  const args = {};
-  for (let i = 2; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg === "--dry-run") args.dryRun = true;
-    else if (arg === "--file") args.file = argv[++i];
-    else if (arg === "--concurrency") args.concurrency = parseInt(argv[++i], 10) || 5;
-    else if (arg === "--source") args.source = argv[++i];
-    else if (arg === "--job-id") args.jobId = argv[++i];
-    else if (arg === "--no-rtdb") args.noRtdb = true;
-    else if (arg === "--skip-errors") args.skipErrors = false;
-  }
-  return args;
+for (let i = 0; i < args.length; i++) {
+  if ((args[i] === '--file' || args[i] === '-f') && args[i + 1]) inputFile = args[++i];
+  if (args[i] === '--concurrency' && args[i + 1]) concurrency = parseInt(args[++i], 10) || 5;
 }
 
-// ─── Progress Bar ─────────────────────────────────────────────────────────────
-
-function renderProgress(done, total, errors, startTime) {
-  const pct = Math.round((done / total) * 100);
-  const elapsed = (Date.now() - startTime) / 1000;
-  const rate = done / elapsed;
-  const remaining = rate > 0 ? Math.round((total - done) / rate) : "?";
-  const bar = "█".repeat(Math.floor(pct / 5)) + "░".repeat(20 - Math.floor(pct / 5));
-  process.stdout.write(`\r  [${bar}] ${pct}% | ${done}/${total} | ✅${done - errors} ❌${errors} | ${remaining}s left  `);
+if (!inputFile) {
+  console.error('Usage: node scripts/import.js --file <contacts.vcf|contacts.json>');
+  process.exit(1);
 }
 
-// ─── Import Logic ─────────────────────────────────────────────────────────────
-
-async function importContacts(contacts, options = {}) {
-  const { concurrency = 5, dryRun = false, sourceFile = null, jobId = null, noRtdb = false } = options;
-
-  const total = contacts.length;
-  let done = 0;
-  let success = 0;
-  let errors = 0;
-  const errorList = [];
-  const startTime = Date.now();
-
-  const rtdb = noRtdb ? null : getRtdb();
-
-  // Khởi tạo job trong Realtime DB (nếu có jobId)
-  if (jobId && rtdb) {
-    await rtdb.ref(`import_jobs/${jobId}`).set({
-      status: "running",
-      total,
-      done: 0,
-      success: 0,
-      errors: 0,
-      source: sourceFile || "script",
-      startedAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
-  }
-
-  console.log(`\n🚀 Starting import: ${total} contacts (concurrency: ${concurrency})${dryRun ? " [DRY RUN]" : ""}`);
-  if (sourceFile) console.log(`   Source: ${sourceFile}`);
-  console.log("");
-
-  // Process theo chunks
-  for (let i = 0; i < total; i += concurrency) {
-    const chunk = contacts.slice(i, i + concurrency);
-
-    let results;
-    if (dryRun) {
-      // Dry run: chỉ validate không ghi
-      results = chunk.map((contact, idx) => {
-        const hasName = contact.contact?.displayName || contact.displayName;
-        const hasEmail = contact.contact?.emails?.length || contact.emails?.length;
-        if (!hasName && !hasEmail) {
-          return { status: "rejected", reason: new Error("Missing displayName and email") };
-        }
-        return { status: "fulfilled", value: { contactId: `dry_${i + idx}` } };
-      });
-    } else {
-      results = await Promise.allSettled(
-        chunk.map((contact) =>
-          writeContact(contact, {
-            isUpdate: false,
-            sourceFile,
-            importedAt: new Date(),
-          }),
-        ),
-      );
-    }
-
-    for (let j = 0; j < results.length; j++) {
-      done++;
-      if (results[j].status === "fulfilled") {
-        success++;
-      } else {
-        errors++;
-        errorList.push({
-          index: i + j,
-          contact: contacts[i + j]?.contact?.displayName || contacts[i + j]?.displayName || "(unknown)",
-          error: results[j].reason?.message || "Unknown error",
-        });
-      }
-    }
-
-    renderProgress(done, total, errors, startTime);
-
-    // Cập nhật Realtime DB mỗi 50 contacts
-    if (jobId && rtdb && (done % 50 === 0 || done === total)) {
-      await rtdb
-        .ref(`import_jobs/${jobId}`)
-        .update({
-          done,
-          success,
-          errors,
-          updatedAt: new Date().toISOString(),
-        })
-        .catch(() => {}); // non-critical
-    }
-  }
-
-  process.stdout.write("\n");
-
-  // Cập nhật meta/stats trong Firestore
-  if (!dryRun && success > 0) {
-    try {
-      const db = getFirestore();
-      await db
-        .collection("meta")
-        .doc("stats")
-        .set(
-          {
-            totalContacts: FieldValue.increment(success),
-            updatedAt: new Date().toISOString(),
-          },
-          { merge: true },
-        );
-      console.log(`\n📊 Updated meta/stats: +${success} contacts`);
-    } catch (e) {
-      console.warn("\n⚠️  Failed to update meta/stats:", e.message);
-    }
-  }
-
-  // Final RTDB update
-  if (jobId && rtdb) {
-    const finalStatus = errors === total ? "failed" : errors > 0 ? "partial" : "completed";
-    await rtdb
-      .ref(`import_jobs/${jobId}`)
-      .update({
-        status: finalStatus,
-        done,
-        success,
-        errors,
-        errorSample: errorList.slice(0, 10),
-        completedAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      })
-      .catch(() => {});
-  }
-
-  return { total, success, errors, errorList, durationMs: Date.now() - startTime };
-}
-
-// ─── Main ─────────────────────────────────────────────────────────────────────
-
+// ─── Main ────────────────────────────────────────────────────────────────────
 async function main() {
-  const args = parseArgs(process.argv);
+  const absolutePath = path.resolve(inputFile);
+  const sourceFile = path.basename(inputFile);
+  const ext = path.extname(inputFile).toLowerCase();
 
-  if (!args.file) {
-    console.error("Usage: node scripts/import.js --file <contacts.vcf|contacts.json> [options]");
-    console.error("\nOptions:");
-    console.error("  --dry-run          Validate without writing to Firestore");
-    console.error("  --concurrency <n>  Parallel writes (default: 5)");
-    console.error("  --source <name>    Tag contacts with source filename");
-    console.error("  --job-id <id>      Track progress in Realtime DB");
-    console.error("  --no-rtdb          Skip Realtime DB job tracking");
+  if (!fs.existsSync(absolutePath)) {
+    console.error(`❌ File not found: ${absolutePath}`);
     process.exit(1);
   }
 
-  const filePath = path.resolve(args.file);
-  if (!fs.existsSync(filePath)) {
-    console.error(`❌ File not found: ${filePath}`);
+  console.log(`\n📂 Reading: ${absolutePath}`);
+
+  // Parse input
+  let contacts = [];
+  if (ext === '.vcf' || ext === '.vcard') {
+    contacts = await parseVcfFile(absolutePath);
+    console.log(`📇 Parsed ${contacts.length} vCards from VCF`);
+  } else if (ext === '.json') {
+    const raw = fs.readFileSync(absolutePath, 'utf8');
+    const parsed = JSON.parse(raw);
+    contacts = Array.isArray(parsed) ? parsed : parsed.contacts || [];
+    console.log(`📋 Loaded ${contacts.length} contacts from JSON`);
+  } else {
+    console.error('❌ Unsupported file format. Use .vcf or .json');
     process.exit(1);
   }
 
-  const ext = path.extname(filePath).toLowerCase();
-  const sourceFile = args.source || path.basename(filePath);
-
-  console.log(`\n📂 Reading: ${filePath}`);
-
-  let contacts;
-  try {
-    if (ext === ".vcf" || ext === ".vcard") {
-      contacts = await parseVcfFile(filePath);
-    } else if (ext === ".json") {
-      const raw = fs.readFileSync(filePath, "utf8");
-      const parsed = JSON.parse(raw);
-      contacts = Array.isArray(parsed) ? parsed : parsed.contacts || parsed.data || [];
-    } else {
-      console.error(`❌ Unsupported file type: ${ext} (use .vcf or .json)`);
-      process.exit(1);
-    }
-  } catch (err) {
-    console.error(`❌ Failed to parse file: ${err.message}`);
-    process.exit(1);
-  }
-
-  if (!contacts.length) {
-    console.log("⚠️  No contacts found in file.");
+  if (contacts.length === 0) {
+    console.log('⚠️  No contacts found. Exiting.');
     process.exit(0);
   }
 
-  console.log(`✅ Found ${contacts.length} contacts in file`);
+  // Thêm sourceFile vào mỗi contact
+  const contactsWithMeta = contacts.map(c => ({ ...c, sourceFile }));
 
-  // Tạo job ID nếu không truyền
-  const jobId = args.jobId || (args.noRtdb ? null : `job_${crypto.randomBytes(6).toString("hex")}`);
-  if (jobId && !args.noRtdb) {
-    console.log(`📋 Job ID: ${jobId}`);
-  }
+  // Bắt đầu import
+  const startTime = Date.now();
+  console.log(`\n🚀 Importing ${contacts.length} contacts (concurrency: ${concurrency})...`);
 
-  const result = await importContacts(contacts, {
-    concurrency: args.concurrency || 5,
-    dryRun: !!args.dryRun,
-    sourceFile,
-    jobId,
-    noRtdb: !!args.noRtdb,
+  let lastReported = 0;
+  const result = await bulkWriteContacts(contactsWithMeta, {
+    concurrency,
+    onProgress: (done, total) => {
+      const pct = Math.floor((done / total) * 100);
+      // Log mỗi 10%
+      if (pct >= lastReported + 10 || done === total) {
+        lastReported = Math.floor(pct / 10) * 10;
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+        process.stdout.write(`\r  ⏳ ${done}/${total} (${pct}%) — ${elapsed}s`);
+      }
+    },
   });
 
-  // Summary
-  const duration = (result.durationMs / 1000).toFixed(1);
-  const rate = Math.round(result.total / (result.durationMs / 1000));
+  const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+  console.log('\n');
 
-  console.log("\n" + "━".repeat(50));
-  console.log(`✅ Import ${args.dryRun ? "(DRY RUN) " : ""}complete!`);
-  console.log(`   Total:    ${result.total}`);
+  // ── Cập nhật meta/stats ───────────────────────────────────────────────────
+  try {
+    const db = getFirestore();
+    await db.collection('meta').doc('stats').set(
+      {
+        totalContacts: FieldValue.increment(result.success),
+        lastImportAt: new Date().toISOString(),
+        lastImportFile: sourceFile,
+        lastImportCount: result.success,
+      },
+      { merge: true }
+    );
+  } catch (err) {
+    console.warn('⚠️  Could not update meta/stats:', err.message);
+  }
+
+  // ── Report ────────────────────────────────────────────────────────────────
+  console.log('━'.repeat(50));
+  console.log(`✅ Import complete in ${elapsed}s`);
+  console.log(`   Total:    ${contacts.length}`);
   console.log(`   Success:  ${result.success}`);
-  console.log(`   Errors:   ${result.errors}`);
-  console.log(`   Duration: ${duration}s (~${rate} contacts/s)`);
+  console.log(`   Errors:   ${result.errors.length}`);
 
-  if (result.errorList.length > 0) {
-    console.log("\n❌ First errors:");
-    for (const err of result.errorList.slice(0, 5)) {
-      console.log(`   [${err.index}] ${err.contact}: ${err.error}`);
-    }
-    if (result.errorList.length > 5) {
-      console.log(`   ... and ${result.errorList.length - 5} more`);
+  if (result.errors.length > 0) {
+    console.log('\n⚠️  Errors (first 10):');
+    result.errors.slice(0, 10).forEach(e => {
+      console.log(`   - [${e.index}] ${e.error}`);
+    });
+    if (result.errors.length > 10) {
+      console.log(`   ... and ${result.errors.length - 10} more`);
     }
   }
 
-  console.log("━".repeat(50) + "\n");
+  console.log('━'.repeat(50));
+  console.log('');
 
-  process.exit(result.errors > 0 && result.success === 0 ? 1 : 0);
+  process.exit(result.errors.length > 0 ? 1 : 0);
 }
 
-main().catch((err) => {
-  console.error("\n❌ Fatal error:", err.message);
+main().catch(err => {
+  console.error('\n❌ Fatal error:', err);
   process.exit(1);
 });

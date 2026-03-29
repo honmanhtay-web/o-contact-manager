@@ -1,434 +1,317 @@
-#!/usr/bin/env node
-"use strict";
+'use strict';
 
 /**
- * scripts/vcf2json.js — VCF (vCard) 3.0 / 4.0 parser
+ * scripts/vcf2json.js — VCF (vCard 3.0/4.0) → JSON parser
  *
- * Parse file VCF thành mảng JSON theo schema contacts_detail
- *
- * Usage (module):
- *   const { parseVcfFile, parseVcfString } = require('./vcf2json');
+ * Usage:
+ *   const { parseVcf, parseVcfFile } = require('./vcf2json');
+ *   const contacts = parseVcf(vcfString);
  *   const contacts = await parseVcfFile('./contacts.vcf');
  *
- * Usage (CLI):
- *   node scripts/vcf2json.js input.vcf
- *   node scripts/vcf2json.js input.vcf --output output.json
- *   node scripts/vcf2json.js input.vcf --stats
+ * Output format (mỗi contact):
+ * {
+ *   contact: { displayName, name, emails, phones, organization, categories, ... },
+ *   userDefined: { key: value, ... },
+ *   vcfRaw: "BEGIN:VCARD\n...\nEND:VCARD"
+ * }
  */
 
-const fs = require("fs");
-const path = require("path");
+const fs = require('fs');
+const path = require('path');
 
-// ─── VCF Line Unfolding ───────────────────────────────────────────────────────
+// ─── VCF line unfolding ───────────────────────────────────────────────────────
 
 /**
- * VCF dùng "line folding" — dòng dài bị gấp với CRLF + whitespace
- * Unfold: ghép lại thành 1 dòng
+ * Unfold VCF lines (RFC 6350 section 3.2)
+ * Dòng tiếp theo bắt đầu bằng SPACE/TAB là continuation của dòng trước
+ * @param {string} text
+ * @returns {string}
  */
-function unfoldLines(raw) {
-  return raw
-    .replace(/\r\n/g, "\n")
-    .replace(/\r/g, "\n")
-    .replace(/\n[ \t]/g, ""); // unfold
+function unfoldLines(text) {
+  return text.replace(/\r\n[ \t]/g, '').replace(/\n[ \t]/g, '');
 }
 
-// ─── Property Parser ──────────────────────────────────────────────────────────
+// ─── Property parser ──────────────────────────────────────────────────────────
 
 /**
  * Parse 1 VCF property line thành { name, params, value }
+ * Ví dụ: "EMAIL;TYPE=INTERNET,HOME:user@gmail.com"
+ * → { name: "EMAIL", params: { TYPE: ["INTERNET", "HOME"] }, value: "user@gmail.com" }
  *
- * Ví dụ:
- *   "EMAIL;TYPE=INTERNET,WORK:john@work.com"
- *   → { name: 'EMAIL', params: { TYPE: ['INTERNET','WORK'] }, value: 'john@work.com' }
- *
- *   "item1.EMAIL;TYPE=INTERNET:john@gmail.com"
- *   → { name: 'EMAIL', group: 'item1', params: {...}, value: '...' }
+ * @param {string} line
+ * @returns {{ name: string, params: object, value: string }|null}
  */
-function parsePropLine(line) {
-  // Tách group.name;params:value
-  const colonIdx = line.indexOf(":");
-  if (colonIdx === -1) return null;
+function parseProp(line) {
+  const colonIdx = line.indexOf(':');
+  if (colonIdx < 0) return null;
 
-  const nameAndParams = line.slice(0, colonIdx);
-  const value = line.slice(colonIdx + 1);
+  const propPart = line.slice(0, colonIdx);
+  let value = line.slice(colonIdx + 1);
 
-  const parts = nameAndParams.split(";");
-  let nameWithGroup = parts[0];
-  const paramParts = parts.slice(1);
-
-  // Tách group prefix (e.g. "item1.EMAIL")
-  // Lưu ý: X-custom.key KHÔNG phải group — chỉ tách nếu phần sau dấu . là tên prop hợp lệ
-  let group = null;
-  const dotIdx = nameWithGroup.indexOf(".");
-  if (dotIdx !== -1 && !nameWithGroup.toUpperCase().startsWith("X-")) {
-    group = nameWithGroup.slice(0, dotIdx).toLowerCase();
-    nameWithGroup = nameWithGroup.slice(dotIdx + 1);
-  }
-
-  const name = nameWithGroup.toUpperCase();
-
-  // Parse params
+  // Decode quoted-printable nếu có ENCODING=QUOTED-PRINTABLE
+  const parts = propPart.split(';');
+  const name = parts[0].toUpperCase();
   const params = {};
-  for (const p of paramParts) {
-    const eqIdx = p.indexOf("=");
-    if (eqIdx === -1) {
-      // Shorthand: TYPE=value (vCard 2.1 style)
-      params["TYPE"] = params["TYPE"] || [];
-      params["TYPE"].push(p.toUpperCase());
-    } else {
-      const paramName = p.slice(0, eqIdx).toUpperCase();
-      const paramVal = p.slice(eqIdx + 1);
-      params[paramName] = params[paramName] || [];
-      params[paramName].push(...paramVal.split(",").map((v) => v.toUpperCase().replace(/^"|"$/g, "")));
+
+  for (let i = 1; i < parts.length; i++) {
+    const eqIdx = parts[i].indexOf('=');
+    if (eqIdx < 0) {
+      // Bare param như "QUOTED-PRINTABLE" or "UTF-8"
+      params[parts[i].toUpperCase()] = true;
+      continue;
     }
+    const k = parts[i].slice(0, eqIdx).toUpperCase();
+    const v = parts[i].slice(eqIdx + 1);
+    // Multiple values: TYPE=INTERNET,HOME
+    params[k] = v.includes(',') ? v.split(',') : [v];
   }
 
-  return { name, group, params, value: decodeValue(value, params["ENCODING"]?.[0]) };
-}
-
-// ─── Value Decoding ───────────────────────────────────────────────────────────
-
-function decodeValue(value, encoding) {
-  if (!encoding) return unescapeVcf(value);
-  if (encoding === "QUOTED-PRINTABLE") return decodeQP(value);
-  if (encoding === "BASE64" || encoding === "B") return value; // Keep raw base64
-  return unescapeVcf(value);
-}
-
-function unescapeVcf(str) {
-  if (!str) return "";
-  return str.replace(/\\n/gi, "\n").replace(/\\,/g, ",").replace(/\\;/g, ";").replace(/\\\\/g, "\\");
-}
-
-function decodeQP(str) {
-  try {
-    // Simple QP decode
-    return str
-      .replace(/=\r?\n/g, "") // soft line break
-      .replace(/=([0-9A-Fa-f]{2})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
-  } catch {
-    return str;
+  // Decode QUOTED-PRINTABLE
+  if (params['ENCODING'] && params['ENCODING'][0] === 'QUOTED-PRINTABLE') {
+    value = decodeQuotedPrintable(value);
   }
+
+  // Unescape backslash sequences (\n \, \; \:)
+  value = value
+    .replace(/\\n/gi, '\n')
+    .replace(/\\,/g, ',')
+    .replace(/\\;/g, ';')
+    .replace(/\\\\/g, '\\');
+
+  return { name, params, value };
 }
-
-// ─── Structured Value Parsers ─────────────────────────────────────────────────
-
-/** N field: "Family;Given;Middle;Prefix;Suffix" */
-function parseName(value) {
-  const [family = "", given = "", middle = "", prefix = "", suffix = ""] = value.split(";").map((s) => s.trim());
-  const result = {};
-  if (family) result.family = family;
-  if (given) result.given = given;
-  if (middle) result.middle = middle;
-  if (prefix) result.prefix = prefix;
-  if (suffix) result.suffix = suffix;
-  return Object.keys(result).length ? result : null;
-}
-
-/** ADR field: "PO Box;Ext;Street;City;Region;Postal;Country" */
-function parseAddress(value) {
-  const [poBox, ext, street, city, region, postal, country] = value.split(";").map((s) => s.trim());
-  const result = {};
-  if (poBox) result.poBox = poBox;
-  if (ext) result.ext = ext;
-  if (street) result.street = street;
-  if (city) result.city = city;
-  if (region) result.region = region;
-  if (postal) result.postal = postal;
-  if (country) result.country = country;
-  return Object.keys(result).length ? result : null;
-}
-
-// ─── vCard Block Parser ───────────────────────────────────────────────────────
 
 /**
- * Parse 1 vCard block (BEGIN:VCARD → END:VCARD) thành contact JSON
- * Output format tương thích với contacts_detail.contact + userDefined
+ * Decode QUOTED-PRINTABLE encoding
+ * @param {string} str
+ * @returns {string}
  */
-function parseVcard(lines) {
-  const props = lines
-    .filter((l) => l && !["BEGIN:VCARD", "END:VCARD", "VERSION:2.1", "VERSION:3.0", "VERSION:4.0"].some((skip) => l.startsWith(skip)))
-    .map(parsePropLine)
-    .filter(Boolean);
+function decodeQuotedPrintable(str) {
+  return str.replace(/=([0-9A-F]{2})/gi, (_, hex) =>
+    String.fromCharCode(parseInt(hex, 16))
+  );
+}
 
-  const contact = {};
+// ─── Single vCard parser ──────────────────────────────────────────────────────
+
+/**
+ * Parse 1 vCard string thành contact object
+ * @param {string} vcardText — nội dung 1 vCard (BEGIN:VCARD...END:VCARD)
+ * @returns {object|null}
+ */
+function parseVcard(vcardText) {
+  const lines = unfoldLines(vcardText).split(/\r?\n/).filter(l => l.trim());
+  if (!lines.length) return null;
+
+  const contact = {
+    displayName: '',
+    name: null,
+    emails: [],
+    phones: [],
+    addresses: [],
+    organization: '',
+    categories: [],
+    note: '',
+    birthday: null,
+    photoUrl: null,
+    extensions: {},
+  };
   const userDefined = {};
-  const extensions = {};
-  let vcfRaw = lines.join("\r\n");
 
-  for (const prop of props) {
-    const { name, params, value, group } = prop;
-    const types = params["TYPE"] || [];
+  for (const line of lines) {
+    if (!line || line.toUpperCase() === 'BEGIN:VCARD' || line.toUpperCase() === 'END:VCARD') continue;
+
+    const prop = parseProp(line);
+    if (!prop) continue;
+
+    const { name, params, value } = prop;
 
     switch (name) {
-      case "FN":
-        contact.displayName = value;
+      case 'FN':
+        contact.displayName = value.trim();
         break;
 
-      case "N": {
-        const n = parseName(value);
-        if (n) contact.name = n;
+      case 'N': {
+        // N:Family;Given;Middle;Prefix;Suffix
+        const parts = value.split(';');
+        contact.name = {
+          family: parts[0] || '',
+          given: parts[1] || '',
+          middle: parts[2] || '',
+          prefix: parts[3] || '',
+          suffix: parts[4] || '',
+        };
+        // Bỏ field rỗng
+        Object.keys(contact.name).forEach(k => {
+          if (!contact.name[k]) delete contact.name[k];
+        });
+        if (!Object.keys(contact.name).length) contact.name = null;
         break;
       }
 
-      case "EMAIL": {
-        if (!value || !value.includes("@")) break;
-        contact.emails = contact.emails || [];
-        const emailType = types.length ? types : ["INTERNET"];
+      case 'EMAIL': {
+        const types = params['TYPE'] || ['INTERNET'];
         contact.emails.push({
-          type: emailType,
+          type: types.map(t => t.toUpperCase()),
           value: value.toLowerCase().trim(),
-          ...(group ? { group } : {}),
+          label: params['LABEL'] ? params['LABEL'][0] : null,
         });
         break;
       }
 
-      case "TEL": {
-        if (!value) break;
-        contact.phones = contact.phones || [];
-        const telType = types.length ? types : ["VOICE"];
+      case 'TEL': {
+        const types = params['TYPE'] || ['VOICE'];
         contact.phones.push({
-          type: telType,
+          type: types.map(t => t.toUpperCase()),
           value: value.trim(),
         });
         break;
       }
 
-      case "ORG": {
-        // ORG: "Company;Department;Unit"
-        const orgParts = value.split(";").filter(Boolean);
-        if (orgParts[0]) {
-          contact.organization = orgParts[0].trim();
-          if (orgParts[1]) contact.department = orgParts[1].trim();
+      case 'ORG':
+        // ORG:Company;Department
+        contact.organization = value.split(';')[0].trim();
+        break;
+
+      case 'CATEGORIES':
+        contact.categories = value.split(',').map(c => c.trim()).filter(Boolean);
+        break;
+
+      case 'NOTE':
+        contact.note = value;
+        break;
+
+      case 'BDAY':
+        contact.birthday = value.trim();
+        break;
+
+      case 'PHOTO':
+        // URL type
+        if (params['VALUE'] && params['VALUE'][0] === 'URI') {
+          contact.photoUrl = value.trim();
+        } else if (params['VALUE'] && params['VALUE'][0] === 'URL') {
+          contact.photoUrl = value.trim();
         }
+        // Bỏ qua base64 embedded photos
+        break;
+
+      case 'ADR': {
+        // ADR:POBox;Extended;Street;City;State;Zip;Country
+        const parts = value.split(';');
+        const types = params['TYPE'] || ['HOME'];
+        contact.addresses.push({
+          type: types.map(t => t.toUpperCase()),
+          poBox: parts[0] || '',
+          street: parts[2] || '',
+          city: parts[3] || '',
+          state: parts[4] || '',
+          zip: parts[5] || '',
+          country: parts[6] || '',
+        });
         break;
       }
-
-      case "TITLE":
-        if (value) contact.title = value.trim();
-        break;
-
-      case "ADR": {
-        const addr = parseAddress(value);
-        if (addr) {
-          contact.addresses = contact.addresses || [];
-          contact.addresses.push({
-            type: types.length ? types : ["HOME"],
-            ...addr,
-          });
-        }
-        break;
-      }
-
-      case "URL":
-        if (value) {
-          contact.urls = contact.urls || [];
-          contact.urls.push({ type: types.length ? types : ["HOME"], value: value.trim() });
-        }
-        break;
-
-      case "NOTE":
-        if (value) contact.note = value.trim();
-        break;
-
-      case "BDAY":
-        if (value) contact.birthday = value.replace(/^(\d{4})(\d{2})(\d{2})$/, "$1-$2-$3").trim();
-        break;
-
-      case "NICKNAME":
-        if (value) contact.nickname = value.trim();
-        break;
-
-      case "PHOTO":
-        // Lưu type để biết có ảnh, không lưu raw base64 vào contact
-        if (value) contact.hasPhoto = true;
-        break;
-
-      case "CATEGORIES": {
-        // "myContacts,friends" hoặc "myContacts;friends"
-        const cats = value
-          .split(/[,;]/)
-          .map((c) => c.trim())
-          .filter(Boolean);
-        if (cats.length) contact.categories = cats;
-        break;
-      }
-
-      case "UID":
-        if (value) contact.uid = value.trim();
-        break;
-
-      case "REV":
-        if (value) contact.rev = value.trim();
-        break;
 
       default:
-        // X-custom fields → extensions hoặc userDefined
-        if (name.startsWith("X-")) {
-          const cleanName = name.slice(2); // Remove X- prefix
-
-          // Một số X- fields phổ biến có tên riêng
-          if (name === "X-GOOGLE-TALK" || name === "X-JABBER") {
-            contact.ims = contact.ims || [];
-            contact.ims.push({ type: [cleanName], value: value.trim() });
-          } else if (name === "X-ABLABEL") {
-            // iCloud label — bỏ qua
+        // X- extensions và X-ABRELATEDNAMES, X-GOOGLE-*, v.v.
+        if (name.startsWith('X-')) {
+          const xKey = name.slice(2); // bỏ "X-"
+          // X-ABCW keys có thể là userDefined (ví dụ X-GITHUB-TOKEN)
+          if (xKey.includes('-')) {
+            // Chuyển X-GITHUB-TOKEN → github.token
+            const udKey = xKey.toLowerCase().replace(/-/g, '.');
+            userDefined[udKey] = value;
           } else {
-            // Lưu vào extensions — dùng chữ thường để key nhất quán
-            const extKey = cleanName.toLowerCase();
-            extensions[extKey] = value.trim();
+            contact.extensions[xKey] = value;
           }
         }
         break;
     }
   }
 
-  // Map extensions sang userDefined nếu có
-  // Giữ nguyên tên extension key
-  Object.assign(userDefined, extensions);
-
-  // Nếu không có displayName, tự sinh từ name
+  // Tạo displayName từ N nếu FN trống
   if (!contact.displayName && contact.name) {
     const n = contact.name;
-    const parts = [n.prefix, n.given, n.middle, n.family, n.suffix].filter(Boolean);
-    if (parts.length) contact.displayName = parts.join(" ");
+    contact.displayName = [n.prefix, n.given, n.middle, n.family, n.suffix]
+      .filter(Boolean)
+      .join(' ');
   }
 
-  // Nếu vẫn không có displayName, dùng email đầu tiên
-  if (!contact.displayName && contact.emails?.length) {
-    contact.displayName = contact.emails[0].value;
-  }
-
-  // Set default categories nếu chưa có
-  if (!contact.categories) contact.categories = [];
+  // Bỏ field rỗng
+  if (!contact.note) delete contact.note;
+  if (!contact.birthday) delete contact.birthday;
+  if (!contact.photoUrl) delete contact.photoUrl;
+  if (!contact.organization) delete contact.organization;
+  if (!contact.addresses.length) delete contact.addresses;
+  if (!Object.keys(contact.extensions).length) delete contact.extensions;
+  if (!contact.name) delete contact.name;
 
   return {
     contact,
-    ...(Object.keys(userDefined).length ? { userDefined } : {}),
-    vcfRaw,
+    userDefined,
+    vcfRaw: vcardText.trim(),
   };
 }
 
-// ─── Main Parser ──────────────────────────────────────────────────────────────
+// ─── Multi-vCard parser ───────────────────────────────────────────────────────
 
 /**
- * Parse VCF string thành mảng contact JSON
- * @param {string} vcfString — nội dung file VCF
- * @returns {Array} mảng { contact, userDefined?, vcfRaw }
+ * Parse chuỗi VCF chứa nhiều vCards
+ * @param {string} vcfText
+ * @returns {object[]} mảng contact objects
  */
-function parseVcfString(vcfString) {
-  const unfolded = unfoldLines(vcfString);
-  const lines = unfolded.split("\n");
+function parseVcf(vcfText) {
+  if (!vcfText || typeof vcfText !== 'string') return [];
 
-  const contacts = [];
-  let currentBlock = [];
-  let inCard = false;
+  // Split theo BEGIN:VCARD / END:VCARD
+  const vcardRegex = /BEGIN:VCARD[\s\S]*?END:VCARD/gi;
+  const matches = vcfText.match(vcardRegex) || [];
 
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-
-    if (trimmed.toUpperCase() === "BEGIN:VCARD") {
-      currentBlock = [trimmed];
-      inCard = true;
-    } else if (trimmed.toUpperCase() === "END:VCARD") {
-      currentBlock.push(trimmed);
-      inCard = false;
-
-      try {
-        const parsed = parseVcard(currentBlock);
-        // Chỉ thêm nếu có ít nhất displayName hoặc email
-        if (parsed.contact.displayName || parsed.contact.emails?.length) {
-          contacts.push(parsed);
-        }
-      } catch (err) {
-        console.warn("[vcf2json] Skipped malformed vCard:", err.message);
-      }
-
-      currentBlock = [];
-    } else if (inCard) {
-      currentBlock.push(trimmed);
+  const results = [];
+  for (const vcardText of matches) {
+    const contact = parseVcard(vcardText);
+    if (contact && (contact.contact.displayName || contact.contact.emails.length)) {
+      results.push(contact);
     }
   }
 
-  return contacts;
+  return results;
 }
 
 /**
- * Parse VCF file thành mảng contact JSON
- * @param {string} filePath — đường dẫn đến file VCF
- * @returns {Promise<Array>}
+ * Parse file VCF từ disk
+ * @param {string} filePath
+ * @returns {Promise<object[]>}
  */
 async function parseVcfFile(filePath) {
-  const resolved = path.resolve(filePath);
-  const content = fs.readFileSync(resolved, "utf8");
-  return parseVcfString(content);
+  const absolutePath = path.resolve(filePath);
+  const text = await fs.promises.readFile(absolutePath, 'utf8');
+  return parseVcf(text);
 }
 
-// ─── Stats Helper ─────────────────────────────────────────────────────────────
-
-function printStats(contacts) {
-  const total = contacts.length;
-  const withEmail = contacts.filter((c) => c.contact.emails?.length).length;
-  const withPhone = contacts.filter((c) => c.contact.phones?.length).length;
-  const withOrg = contacts.filter((c) => c.contact.organization).length;
-  const withUD = contacts.filter((c) => c.userDefined && Object.keys(c.userDefined).length).length;
-  const withPhoto = contacts.filter((c) => c.contact.hasPhoto).length;
-  const catSet = new Set(contacts.flatMap((c) => c.contact.categories || []));
-  const emailTotal = contacts.reduce((s, c) => s + (c.contact.emails?.length || 0), 0);
-
-  console.log("\n📊 VCF Parse Stats:");
-  console.log("━".repeat(40));
-  console.log(`  Total contacts:    ${total}`);
-  console.log(`  With email:        ${withEmail} (${Math.round((withEmail / total) * 100)}%)`);
-  console.log(`  Total emails:      ${emailTotal}`);
-  console.log(`  With phone:        ${withPhone}`);
-  console.log(`  With organization: ${withOrg}`);
-  console.log(`  With userDefined:  ${withUD}`);
-  console.log(`  With photo:        ${withPhoto}`);
-  console.log(`  Categories:        ${[...catSet].join(", ") || "(none)"}`);
-  console.log("━".repeat(40));
-}
-
-// ─── CLI Entry ────────────────────────────────────────────────────────────────
-
+// ─── CLI usage ────────────────────────────────────────────────────────────────
 if (require.main === module) {
-  const args = process.argv.slice(2);
-  const inputFile = args.find((a) => !a.startsWith("--"));
-  const outputFile = args[args.indexOf("--output") + 1];
-  const statsOnly = args.includes("--stats");
+  const inputFile = process.argv[2];
+  const outputFile = process.argv[3];
 
   if (!inputFile) {
-    console.error("Usage: node scripts/vcf2json.js <input.vcf> [--output output.json] [--stats]");
+    console.error('Usage: node vcf2json.js <input.vcf> [output.json]');
     process.exit(1);
   }
-
-  if (!fs.existsSync(inputFile)) {
-    console.error(`File not found: ${inputFile}`);
-    process.exit(1);
-  }
-
-  console.log(`\n📂 Parsing: ${inputFile}`);
 
   parseVcfFile(inputFile)
-    .then((contacts) => {
-      console.log(`✅ Parsed ${contacts.length} contacts`);
-
-      if (statsOnly || args.includes("--stats")) {
-        printStats(contacts);
-      }
-
+    .then(contacts => {
+      const json = JSON.stringify(contacts, null, 2);
       if (outputFile) {
-        fs.writeFileSync(outputFile, JSON.stringify(contacts, null, 2), "utf8");
-        console.log(`💾 Saved to: ${outputFile}`);
-      } else if (!statsOnly) {
-        console.log(JSON.stringify(contacts, null, 2));
+        fs.writeFileSync(outputFile, json, 'utf8');
+        console.log(`✅ Parsed ${contacts.length} contacts → ${outputFile}`);
+      } else {
+        console.log(json);
       }
     })
-    .catch((err) => {
-      console.error("Error:", err.message);
+    .catch(err => {
+      console.error('❌ Error:', err.message);
       process.exit(1);
     });
 }
 
-module.exports = { parseVcfFile, parseVcfString, parseVcard, parsePropLine };
+module.exports = { parseVcf, parseVcfFile, parseVcard };

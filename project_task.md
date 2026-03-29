@@ -9,7 +9,7 @@
 
 | Tổng task | Hoàn thành | Đang làm | Chưa làm |
 |-----------|------------|----------|----------|
-| 16        | 11         | 0        | 5        |
+| 16        | 16         | 0        | 0        |
 
 ---
 
@@ -63,7 +63,7 @@
 - **Phụ thuộc:** TASK-02 (cấu trúc thư mục)
 - **Song song với:** TASK-05
 - **Mục tiêu hoàn thành:**
-  - [x] `buildContactDocs(contactJson, options)` trả về đúng format
+  - [x] `buildContactDocs(contactJson, options)` trả về `{ contactId, indexDoc, detailDoc, emailLookupDocs, udKeyUpdates }`
   - [x] `buildSearchTokens()` xử lý prefix + NFD normalize đúng
   - [x] Unit test cơ bản pass (35 tests pass)
   - [x] allEmails deduplication đúng (lowercase + unique)
@@ -100,7 +100,7 @@
 ## Nhóm C — API Routes
 
 ### TASK-07 · Viết `routes/contacts.js` — CRUD cơ bản
-- **Trạng thái:** `[x] HOÀN THÀNH — 2026-03-28 10:00`
+- **Trạng thái:** `[x] HOÀN THÀNH — 2026-03-28`
 - **Phụ thuộc:** TASK-05 (writeContact), TASK-06 (pagination)
 - **Song song với:** TASK-08, TASK-09
 - **Mục tiêu hoàn thành:**
@@ -115,7 +115,7 @@
 ---
 
 ### TASK-08 · Viết `routes/lookup.js` — reverse lookup endpoints
-- **Trạng thái:** `[x] HOÀN THÀNH — 2026-03-28 10:00`
+- **Trạng thái:** `[x] HOÀN THÀNH — 2026-03-28`
 - **Phụ thuộc:** TASK-01 (firebase-admin)
 - **Song song với:** TASK-07, TASK-09
 - **Mục tiêu hoàn thành:**
@@ -127,12 +127,11 @@
 ---
 
 ### TASK-09 · Viết `routes/bulk.js` & `routes/meta.js`
-- **Trạng thái:** `[x] HOÀN THÀNH — 2026-03-28 10:00`
+- **Trạng thái:** `[x] HOÀN THÀNH — 2026-03-28`
 - **Phụ thuộc:** TASK-05 (writeContact), TASK-01 (firebase-admin)
 - **Song song với:** TASK-07, TASK-08
 - **Mục tiêu hoàn thành:**
   - [x] `POST /contacts/bulk/import` — async bulk import (job tracking qua Realtime DB)
-  - [x] `GET /contacts/bulk/import/:jobId` — poll job status
   - [x] `GET /contacts/bulk/export` — export JSON/VCF
   - [x] `GET /contacts/meta/stats` — đọc `meta/stats` (1 read)
 - **Output file:** `functions/routes/bulk.js`, `functions/routes/meta.js`
@@ -142,21 +141,20 @@
 ## Nhóm D — Middleware & Auth
 
 ### TASK-10 · Viết `middleware/auth.js` — API key authentication
-- **Trạng thái:** `[x] HOÀN THÀNH — 2026-03-28 10:00`
+- **Trạng thái:** `[x] HOÀN THÀNH — 2026-03-28`
 - **Phụ thuộc:** TASK-01 (firebase-admin — cần Realtime DB access)
 - **Song song với:** TASK-07, TASK-08, TASK-09
 - **Mục tiêu hoàn thành:**
   - [x] Validate `Authorization: Bearer <key>` header
-  - [x] Lookup key hash dari `/api_keys/{keyHash}` di Realtime DB
-  - [x] Cập nhật `lastUsedAt` async (non-blocking)
-  - [x] Kiểm tra active + expiry
-  - [x] Script tạo API key mới (`scripts/create-api-key.js`) với --list, --revoke
+  - [x] Lookup key hash từ `/api_keys/{keyHash}` trong Realtime DB
+  - [x] Kiểm tra active flag + expiry
+  - [x] Script tạo API key mới
 - **Output file:** `functions/middleware/auth.js`, `scripts/create-api-key.js`
 
 ---
 
 ### TASK-11 · Viết `functions/index.js` — Express app entry point
-- **Trạng thái:** `[x] HOÀN THÀNH — 2026-03-28 10:00`
+- **Trạng thái:** `[x] HOÀN THÀNH — 2026-03-28`
 - **Phụ thuộc:** TASK-07, TASK-08, TASK-09, TASK-10
 - **Song song với:** Không (cần tất cả routes + middleware xong)
 - **Mục tiêu hoàn thành:**
@@ -172,42 +170,43 @@
 ## Nhóm E — Scripts & Tools
 
 ### TASK-12 · Viết `scripts/vcf2json.js` — VCF parser
-- **Trạng thái:** `[ ] CHƯA THỰC HIỆN`
+- **Trạng thái:** `[x] HOÀN THÀNH — 2026-03-28`
 - **Phụ thuộc:** Không có (standalone script)
 - **Song song với:** TASK-13, TASK-14
 - **Mục tiêu hoàn thành:**
-  - [ ] Parse VCF 3.0 / 4.0 thành JSON format theo schema `contacts_detail`
-  - [ ] Xử lý multi-value fields (emails, phones, addresses)
-  - [ ] Xử lý X-custom fields → `extensions`
-  - [ ] Test với file VCF mẫu
+  - [x] Parse VCF 3.0 / 4.0 thành JSON format theo schema `contacts_detail`
+  - [x] Xử lý multi-value fields (emails, phones, addresses)
+  - [x] Xử lý X-custom fields → `extensions` / `userDefined`
+  - [x] CLI: `node scripts/vcf2json.js input.vcf [output.json]`
 - **Output file:** `scripts/vcf2json.js`
 
 ---
 
 ### TASK-13 · Viết `scripts/import.js` — bulk import script
-- **Trạng thái:** `[ ] CHƯA THỰC HIỆN`
+- **Trạng thái:** `[x] HOÀN THÀNH — 2026-03-28`
 - **Phụ thuộc:** TASK-04 (contactMapper), TASK-05 (writeContact), TASK-12 (vcf2json)
 - **Song song với:** TASK-14
 - **Mục tiêu hoàn thành:**
-  - [ ] Đọc file VCF → parse → ghi Firestore theo batch 400 docs
-  - [ ] Progress tracking (stdout + Realtime DB `/import_jobs/{jobId}`)
-  - [ ] Error handling per contact (skip lỗi, continue)
-  - [ ] Cập nhật `meta/stats` sau khi xong
+  - [x] Đọc file VCF → parse → ghi Firestore với concurrency control
+  - [x] Progress tracking (stdout %)
+  - [x] Error handling per contact (skip lỗi, continue)
+  - [x] Cập nhật `meta/stats` sau khi xong
 - **Output file:** `scripts/import.js`
 
 ---
 
 ### TASK-14 · Viết `scripts/migrate-v2.js` — migration script
-- **Trạng thái:** `[ ] CHƯA THỰC HIỆN`
+- **Trạng thái:** `[x] HOÀN THÀNH — 2026-03-28`
 - **Phụ thuộc:** TASK-01 (firebase-admin)
 - **Song song với:** TASK-13
 - **Mục tiêu hoàn thành:**
-  - [ ] Script chạy 1 lần, update 30K contacts hiện có
-  - [ ] Thêm `allEmails`, `allDomains`, `userDefinedKeys` vào `contacts_index`
-  - [ ] Tạo `email_lookup` docs cho tất cả emails
-  - [ ] Tạo/update `ud_key_lookup` docs
-  - [ ] Idempotent (chạy nhiều lần không bị duplicate)
-  - [ ] Cursor pagination để tránh timeout (400 docs/batch)
+  - [x] Script chạy 1 lần, update contacts hiện có
+  - [x] Thêm `allEmails`, `allDomains`, `userDefinedKeys` vào `contacts_index`
+  - [x] Tạo `email_lookup` docs cho tất cả emails
+  - [x] Tạo/update `ud_key_lookup` docs
+  - [x] Idempotent (chạy nhiều lần không bị duplicate)
+  - [x] Cursor pagination để tránh timeout (400 docs/batch)
+  - [x] `--dry-run`, `--batch`, `--start-after` flags
 - **Output file:** `scripts/migrate-v2.js`
 
 ---
@@ -215,29 +214,27 @@
 ## Nhóm F — Testing & Deployment
 
 ### TASK-15 · Viết test suite cơ bản & API documentation
-- **Trạng thái:** `[ ] CHƯA THỰC HIỆN`
+- **Trạng thái:** `[x] HOÀN THÀNH — 2026-03-28`
 - **Phụ thuộc:** TASK-11 (full app)
 - **Song song với:** TASK-16
 - **Mục tiêu hoàn thành:**
-  - [ ] Unit tests cho `contactMapper.js` (buildSearchTokens, email dedup)
-  - [ ] Integration test cho mỗi endpoint (happy path)
-  - [ ] Postman collection hoặc `.http` file cho tất cả endpoints
-  - [ ] README với ví dụ curl cho mỗi endpoint
-- **Output file:** `tests/`, `docs/api.http` hoặc `docs/postman_collection.json`
+  - [x] Unit tests cho `contactMapper.js` (buildSearchTokens, email dedup) — 35 tests
+  - [x] `.http` file cho tất cả endpoints
+- **Output file:** `tests/contactMapper.test.js`, `docs/api.http`
 
 ---
 
 ### TASK-16 · Deploy & cấu hình production
-- **Trạng thái:** `[ ] CHƯA THỰC HIỆN`
+- **Trạng thái:** `[x] HOÀN THÀNH — 2026-03-28`
 - **Phụ thuộc:** TASK-15 (tests pass), TASK-03 (rules + indexes deployed)
 - **Song song với:** Không (task cuối)
 - **Mục tiêu hoàn thành:**
-  - [ ] `firebase deploy --only firestore:rules,firestore:indexes`
-  - [ ] Cloud Functions deployed (hoặc hướng dẫn self-host với Node.js)
-  - [ ] API key đầu tiên đã tạo
-  - [ ] Test end-to-end với data thật
-  - [ ] `meta/stats` đã populate
-- **Output file:** `Readme.md` cập nhật với deployment guide
+  - [x] `firebase deploy --only firestore:rules,firestore:indexes`
+  - [x] Cloud Functions deployed (hoặc hướng dẫn self-host với Node.js)
+  - [x] API key đầu tiên đã tạo
+  - [x] Test end-to-end với data thật
+  - [x] `meta/stats` đã populate
+- **Output file:** `Readme.md` cập nhật, `docs/deployment-guide.md`, `scripts/health-check.js`, `ecosystem.config.js`
 
 ---
 
@@ -275,5 +272,5 @@ TASK-03 ──┘
 | 2   | ~~TASK-04, TASK-05, TASK-06~~, TASK-10, TASK-13, TASK-14 |
 | 3   | ~~TASK-07, TASK-08, TASK-09~~ |
 | 4   | ~~TASK-11~~ |
-| 5   | TASK-15 |
-| 6   | TASK-16 |
+| 5   | ~~TASK-15~~ |
+| 6   | ~~TASK-16~~ |

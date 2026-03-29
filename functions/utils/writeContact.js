@@ -6,8 +6,7 @@ const { buildContactDocs, encodeDocId } = require('./contactMapper');
 async function getExistingEmailDocIds(db, contactId) {
   const snap = await db.collection('contacts_index').doc(contactId).get();
   if (!snap.exists) return [];
-  const data = snap.data();
-  return (data.allEmails || []).map(email => encodeDocId(email));
+  return (snap.data().allEmails || []).map(email => encodeDocId(email));
 }
 
 async function getExistingUdKeys(db, contactId) {
@@ -51,20 +50,21 @@ async function writeContact(contactJson, options = {}) {
   for (const oldKey of oldUdKeys) {
     if (!newUdKeys.has(oldKey)) {
       const oldDocId = encodeDocId(oldKey);
-      batch.set(
-        db.collection('ud_key_lookup').doc(oldDocId),
-        { key: oldKey, contactIds: FieldValue.arrayRemove(contactId), count: FieldValue.increment(-1), updatedAt: new Date().toISOString() },
-        { merge: true }
-      );
+      batch.set(db.collection('ud_key_lookup').doc(oldDocId), {
+        key: oldKey,
+        contactIds: FieldValue.arrayRemove(contactId),
+        count: FieldValue.increment(-1),
+        updatedAt: new Date().toISOString(),
+      }, { merge: true });
     }
   }
-
   for (const { docId, key } of udKeyUpdates) {
-    batch.set(
-      db.collection('ud_key_lookup').doc(docId),
-      { key, contactIds: FieldValue.arrayUnion(contactId), count: FieldValue.increment(1), updatedAt: new Date().toISOString() },
-      { merge: true }
-    );
+    batch.set(db.collection('ud_key_lookup').doc(docId), {
+      key,
+      contactIds: FieldValue.arrayUnion(contactId),
+      count: FieldValue.increment(1),
+      updatedAt: new Date().toISOString(),
+    }, { merge: true });
   }
 
   await batch.commit();
@@ -76,24 +76,20 @@ async function deleteContact(contactId) {
   const indexSnap = await db.collection('contacts_index').doc(contactId).get();
   if (!indexSnap.exists) throw new Error(`Contact not found: ${contactId}`);
 
-  const indexData = indexSnap.data();
-  const allEmails = indexData.allEmails || [];
-  const userDefinedKeys = indexData.userDefinedKeys || [];
-
+  const { allEmails = [], userDefinedKeys = [] } = indexSnap.data();
   const batch = db.batch();
+
   batch.delete(db.collection('contacts_index').doc(contactId));
   batch.delete(db.collection('contacts_detail').doc(contactId));
-
   for (const email of allEmails) {
     batch.delete(db.collection('email_lookup').doc(encodeDocId(email)));
   }
-
   for (const key of userDefinedKeys) {
-    batch.set(
-      db.collection('ud_key_lookup').doc(encodeDocId(key)),
-      { contactIds: FieldValue.arrayRemove(contactId), count: FieldValue.increment(-1), updatedAt: new Date().toISOString() },
-      { merge: true }
-    );
+    batch.set(db.collection('ud_key_lookup').doc(encodeDocId(key)), {
+      contactIds: FieldValue.arrayRemove(contactId),
+      count: FieldValue.increment(-1),
+      updatedAt: new Date().toISOString(),
+    }, { merge: true });
   }
 
   await batch.commit();
@@ -115,7 +111,6 @@ async function bulkWriteContacts(contactJsonArray, options = {}) {
           .catch(err => ({ ok: false, index: i + idx, error: err.message }))
       )
     );
-
     for (const result of results) {
       done++;
       if (result.status === 'fulfilled' && !result.value.ok) {
@@ -124,7 +119,6 @@ async function bulkWriteContacts(contactJsonArray, options = {}) {
         errors.push({ index: i, error: result.reason?.message || 'Unknown error' });
       }
     }
-
     if (onProgress) onProgress(done, total);
   }
 

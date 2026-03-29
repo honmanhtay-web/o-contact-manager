@@ -11,11 +11,7 @@ function encodeCursor(docId) {
 
 function decodeCursor(cursor) {
   if (!cursor) return null;
-  try {
-    return Buffer.from(cursor, 'base64url').toString('utf8');
-  } catch {
-    return null;
-  }
+  try { return Buffer.from(cursor, 'base64url').toString('utf8'); } catch { return null; }
 }
 
 function parseQueryParams(query = {}) {
@@ -23,7 +19,6 @@ function parseQueryParams(query = {}) {
   const validSorts = ['updatedAt', 'createdAt', 'displayName'];
   const sort = validSorts.includes(query.sort) ? query.sort : 'updatedAt';
   const order = query.order === 'asc' ? 'asc' : 'desc';
-
   return {
     search: query.search?.trim().toLowerCase() || null,
     category: query.category?.trim() || null,
@@ -31,9 +26,7 @@ function parseQueryParams(query = {}) {
     email: query.email?.trim().toLowerCase() || null,
     udKey: query.udKey?.trim() || null,
     hasUD: query.hasUD === 'true' ? true : query.hasUD === 'false' ? false : null,
-    sort,
-    order,
-    limit,
+    sort, order, limit,
     cursor: query.cursor || null,
   };
 }
@@ -41,7 +34,6 @@ function parseQueryParams(query = {}) {
 function buildQuery(params) {
   const db = getFirestore();
   let q = db.collection('contacts_index');
-
   const { search, category, domain, email, udKey, hasUD, sort, order } = params;
 
   if (search && search.length >= 2) {
@@ -50,7 +42,8 @@ function buildQuery(params) {
     q = q.where('allEmails', 'array-contains', email);
   } else if (udKey) {
     if (category) {
-      q = q.where('categories', 'array-contains', category).where('userDefinedKeys', 'array-contains', udKey);
+      q = q.where('categories', 'array-contains', category)
+            .where('userDefinedKeys', 'array-contains', udKey);
     } else {
       q = q.where('userDefinedKeys', 'array-contains', udKey);
     }
@@ -82,24 +75,16 @@ async function paginateQuery(params) {
   q = q.limit(params.limit + 1);
   const snapshot = await q.get();
   const docs = snapshot.docs;
-
   const hasMore = docs.length > params.limit;
   const resultDocs = hasMore ? docs.slice(0, params.limit) : docs;
   const data = resultDocs.map(d => d.data());
   const nextCursor = hasMore ? encodeCursor(resultDocs[resultDocs.length - 1].id) : null;
-
   return { data, nextCursor, hasMore, count: data.length };
 }
 
 function buildListResponse(paginateResult, params) {
   const { data, nextCursor, hasMore, count } = paginateResult;
-  return {
-    data,
-    meta: { count, limit: params.limit, hasMore, nextCursor, sort: params.sort, order: params.order },
-  };
+  return { data, meta: { count, limit: params.limit, hasMore, nextCursor, sort: params.sort, order: params.order } };
 }
 
-module.exports = {
-  parseQueryParams, buildQuery, paginateQuery, buildListResponse,
-  encodeCursor, decodeCursor, DEFAULT_LIMIT, MAX_LIMIT,
-};
+module.exports = { parseQueryParams, buildQuery, paginateQuery, buildListResponse, encodeCursor, decodeCursor, DEFAULT_LIMIT, MAX_LIMIT };

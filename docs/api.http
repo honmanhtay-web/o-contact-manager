@@ -1,0 +1,206 @@
+### Contact Manager API — HTTP Test File
+### Dùng với VSCode REST Client extension hoặc IntelliJ HTTP Client
+### Thay @baseUrl và @apiKey trước khi dùng
+
+@baseUrl = http://localhost:3000
+@apiKey = YOUR_API_KEY_HERE
+
+# ─── Health ──────────────────────────────────────────────────────────────────
+
+### Health Check
+GET {{baseUrl}}/health
+
+# ─── Contacts — List & Search ─────────────────────────────────────────────────
+
+### Danh sách contacts (50 đầu tiên)
+GET {{baseUrl}}/contacts
+Authorization: Bearer {{apiKey}}
+
+### Tìm theo tên (prefix search)
+GET {{baseUrl}}/contacts?search=nguyen
+Authorization: Bearer {{apiKey}}
+
+### Tìm theo organization
+GET {{baseUrl}}/contacts?search=acme
+Authorization: Bearer {{apiKey}}
+
+### Filter theo category
+GET {{baseUrl}}/contacts?category=myContacts
+Authorization: Bearer {{apiKey}}
+
+### Filter theo email domain
+GET {{baseUrl}}/contacts?domain=gmail.com
+Authorization: Bearer {{apiKey}}
+
+### Filter theo email cụ thể
+GET {{baseUrl}}/contacts?email=user@gmail.com
+Authorization: Bearer {{apiKey}}
+
+### Filter theo userDefined key
+GET {{baseUrl}}/contacts?udKey=github.token
+Authorization: Bearer {{apiKey}}
+
+### Filter có userDefined
+GET {{baseUrl}}/contacts?hasUD=true
+Authorization: Bearer {{apiKey}}
+
+### Phân trang — trang 2 (dùng nextCursor từ response trước)
+GET {{baseUrl}}/contacts?cursor=CURSOR_FROM_PREVIOUS_RESPONSE&limit=50
+Authorization: Bearer {{apiKey}}
+
+### Sort theo displayName
+GET {{baseUrl}}/contacts?sort=displayName&order=asc
+Authorization: Bearer {{apiKey}}
+
+### Combo: category + udKey
+GET {{baseUrl}}/contacts?category=myContacts&udKey=github.token
+Authorization: Bearer {{apiKey}}
+
+# ─── Contacts — Detail ───────────────────────────────────────────────────────
+
+### Xem chi tiết 1 contact
+GET {{baseUrl}}/contacts/uid_abc123
+Authorization: Bearer {{apiKey}}
+
+# ─── Contacts — Create ───────────────────────────────────────────────────────
+
+### Tạo contact mới (wrapped format)
+POST {{baseUrl}}/contacts
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "contact": {
+    "displayName": "Nguyen Van An",
+    "emails": [
+      { "type": ["INTERNET", "WORK"], "value": "an@company.com" },
+      { "type": ["INTERNET", "HOME"], "value": "vanan@gmail.com" }
+    ],
+    "phones": [
+      { "type": ["CELL"], "value": "0901234567" }
+    ],
+    "organization": "ACME Corp",
+    "categories": ["myContacts"]
+  },
+  "userDefined": {
+    "github.token": "ghp_xxxxxxxxxxxx",
+    "gitea.token": "gta_xxxxxxxxxxxx"
+  }
+}
+
+### Tạo contact mới (flat format)
+POST {{baseUrl}}/contacts
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "displayName": "Jane Smith",
+  "emails": [{ "value": "jane@example.com" }]
+}
+
+# ─── Contacts — Update ───────────────────────────────────────────────────────
+
+### Update toàn bộ (PUT)
+PUT {{baseUrl}}/contacts/uid_abc123
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "contact": {
+    "displayName": "Nguyen Van An (Updated)",
+    "emails": [
+      { "type": ["INTERNET", "WORK"], "value": "an.new@company.com" }
+    ],
+    "phones": [{ "type": ["CELL"], "value": "0909999999" }],
+    "organization": "New Corp",
+    "categories": ["myContacts", "work"]
+  },
+  "userDefined": {
+    "github.token": "ghp_new_token"
+  }
+}
+
+### Update từng phần (PATCH)
+PATCH {{baseUrl}}/contacts/uid_abc123
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "contact": {
+    "organization": "Updated Org"
+  },
+  "userDefined": {
+    "slack.token": "xoxb-new-token"
+  }
+}
+
+# ─── Contacts — Delete ───────────────────────────────────────────────────────
+
+### Xóa contact
+DELETE {{baseUrl}}/contacts/uid_abc123
+Authorization: Bearer {{apiKey}}
+
+# ─── Lookup ──────────────────────────────────────────────────────────────────
+
+### Lookup theo email
+GET {{baseUrl}}/contacts/by-email/user@gmail.com
+Authorization: Bearer {{apiKey}}
+
+### Lookup theo email có ký tự đặc biệt (URL encode)
+GET {{baseUrl}}/contacts/by-email/user%40gmail.com
+Authorization: Bearer {{apiKey}}
+
+### Lookup theo userDefined key
+GET {{baseUrl}}/contacts/by-ud-key/github.token
+Authorization: Bearer {{apiKey}}
+
+### Liệt kê tất cả userDefined keys
+GET {{baseUrl}}/contacts/ud-keys
+Authorization: Bearer {{apiKey}}
+
+# ─── Bulk ─────────────────────────────────────────────────────────────────────
+
+### Bulk import (async)
+POST {{baseUrl}}/contacts/bulk/import
+Authorization: Bearer {{apiKey}}
+Content-Type: application/json
+
+{
+  "contacts": [
+    {
+      "contact": {
+        "displayName": "Contact 1",
+        "emails": [{ "value": "c1@example.com" }]
+      }
+    },
+    {
+      "contact": {
+        "displayName": "Contact 2",
+        "emails": [{ "value": "c2@example.com" }]
+      }
+    }
+  ],
+  "sourceFile": "manual_import"
+}
+
+### Kiểm tra trạng thái import job
+GET {{baseUrl}}/contacts/bulk/import/job_JOBID_HERE
+Authorization: Bearer {{apiKey}}
+
+### Export toàn bộ (JSON)
+GET {{baseUrl}}/contacts/bulk/export
+Authorization: Bearer {{apiKey}}
+
+### Export category cụ thể (VCF)
+GET {{baseUrl}}/contacts/bulk/export?format=vcf&category=myContacts
+Authorization: Bearer {{apiKey}}
+
+### Export với limit
+GET {{baseUrl}}/contacts/bulk/export?limit=1000
+Authorization: Bearer {{apiKey}}
+
+# ─── Meta ─────────────────────────────────────────────────────────────────────
+
+### Thống kê tổng
+GET {{baseUrl}}/contacts/meta/stats
+Authorization: Bearer {{apiKey}}

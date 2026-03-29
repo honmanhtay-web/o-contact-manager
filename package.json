@@ -16,7 +16,8 @@
     "create-key": "node scripts/create-api-key.js",
     "deploy:rules": "firebase deploy --only firestore:rules,firestore:indexes",
     "deploy:functions": "firebase deploy --only functions",
-    "deploy": "firebase deploy"
+    "deploy": "firebase deploy",
+    "health": "node scripts/health-check.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

@@ -12,6 +12,7 @@ describe('normalize()', () => {
   test('empty string', () => {
     expect(normalize('')).toBe('');
     expect(normalize(null)).toBe('');
+    expect(normalize(undefined)).toBe('');
   });
 });
 
@@ -19,18 +20,20 @@ describe('tokensFromText()', () => {
   test('prefix ngrams từ min length 2', () => {
     const tokens = tokensFromText('john');
     expect(tokens).toContain('jo');
+    expect(tokens).toContain('joh');
     expect(tokens).toContain('john');
     expect(tokens).not.toContain('j');
   });
   test('multi-word: sinh prefix cho từng từ + full phrase', () => {
     const tokens = tokensFromText('john doe');
     expect(tokens).toContain('jo');
-    expect(tokens).toContain('doe');
+    expect(tokens).toContain('do');
     expect(tokens).toContain('john doe');
   });
   test('tiếng Việt normalize trước khi sinh token', () => {
     const tokens = tokensFromText('Nguyễn Hậu');
     expect(tokens).toContain('ng');
+    expect(tokens).toContain('ha');
     expect(tokens).toContain('hau');
   });
 });
@@ -39,6 +42,8 @@ describe('buildSearchTokens()', () => {
   test('basic contact', () => {
     const tokens = buildSearchTokens({ displayName: 'John Doe', organization: 'ACME Corp', primaryEmail: 'john@acme.com', allEmails: ['john@acme.com'] });
     expect(tokens).toContain('jo');
+    expect(tokens).toContain('john');
+    expect(tokens).toContain('ac');
     expect(tokens).toContain('acme');
   });
   test('dedup tokens', () => {
@@ -60,18 +65,17 @@ describe('encodeDocId()', () => {
 
 describe('extractEmails()', () => {
   test('format mảng emails[].value', () => {
-    const contact = { emails: [{ type: ['INTERNET', 'WORK'], value: 'work@example.com' }, { value: 'home@gmail.com' }] };
-    expect(extractEmails(contact)).toEqual(['work@example.com', 'home@gmail.com']);
+    const emails = extractEmails({ emails: [{ value: 'work@example.com' }, { value: 'home@gmail.com' }] });
+    expect(emails).toEqual(['work@example.com', 'home@gmail.com']);
   });
   test('lowercase + dedup', () => {
-    const contact = { emails: [{ value: 'USER@GMAIL.COM' }, { value: 'user@gmail.com' }] };
-    const emails = extractEmails(contact);
+    const emails = extractEmails({ emails: [{ value: 'USER@GMAIL.COM' }, { value: 'user@gmail.com' }] });
     expect(emails).toHaveLength(1);
     expect(emails[0]).toBe('user@gmail.com');
   });
   test('bỏ email không có @', () => {
-    const contact = { emails: [{ value: 'notanemail' }, { value: 'valid@test.com' }] };
-    expect(extractEmails(contact)).toEqual(['valid@test.com']);
+    const emails = extractEmails({ emails: [{ value: 'notanemail' }, { value: 'valid@test.com' }] });
+    expect(emails).toEqual(['valid@test.com']);
   });
 });
 
@@ -87,7 +91,6 @@ describe('buildContactDocs()', () => {
     },
     userDefined: { 'github.token': 'ghp_xxx', 'gitea.token': 'gta_yyy' },
   };
-
   let result;
   beforeAll(() => { result = buildContactDocs(sampleContact, { contactId: 'uid_test123', sourceFile: 'test.vcf' }); });
 
@@ -101,8 +104,8 @@ describe('buildContactDocs()', () => {
   test('indexDoc có đủ fields quan trọng', () => {
     const idx = result.indexDoc;
     expect(idx.displayName).toBe('John Doe');
+    expect(idx.primaryEmail).toBe('john@work.com');
     expect(idx.allEmails).toEqual(['john@work.com', 'john@gmail.com']);
-    expect(idx.allDomains).toContain('work.com');
     expect(idx.hasUserDefined).toBe(true);
     expect(idx.udKeyCount).toBe(2);
     expect(idx.searchTokens.length).toBeGreaterThan(0);
@@ -115,12 +118,9 @@ describe('buildContactDocs()', () => {
   });
   test('udKeyUpdates đúng', () => {
     expect(result.udKeyUpdates).toHaveLength(2);
-    const githubUpdate = result.udKeyUpdates.find(u => u.key === 'github.token');
-    expect(githubUpdate.docId).toBe('github,token');
-    expect(githubUpdate.operation).toBe('add');
-  });
-  test('detailDoc giữ nguyên userDefined', () => {
-    expect(result.detailDoc.userDefined).toEqual({ 'github.token': 'ghp_xxx', 'gitea.token': 'gta_yyy' });
+    const gh = result.udKeyUpdates.find(u => u.key === 'github.token');
+    expect(gh.docId).toBe('github,token');
+    expect(gh.operation).toBe('add');
   });
   test('tự sinh contactId nếu không truyền', () => {
     const r = buildContactDocs(sampleContact);

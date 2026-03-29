@@ -89,7 +89,6 @@ function buildContactDocs(contactJson, options = {}) {
 
   const categories = Array.isArray(contactData.categories) ? contactData.categories : [];
   const tags = Array.isArray(contactData.tags) ? contactData.tags : [];
-
   const photoUrl = contactData.photoUrl || contactData.photo || null;
 
   const userDefinedKeys = extractUdKeys(userDefined);
@@ -101,29 +100,12 @@ function buildContactDocs(contactJson, options = {}) {
   const searchTokens = buildSearchTokens({ displayName, organization, primaryEmail, allEmails });
 
   const indexDoc = {
-    id: contactId,
-    displayName,
-    nameNormalized,
-    primaryEmail,
-    emailDomain,
-    allEmails,
-    allDomains,
-    primaryPhone,
-    organization,
-    photoUrl,
-    categories,
-    tags,
-    searchTokens,
-    userDefinedKeys,
-    hasUserDefined,
-    udKeyCount: userDefinedKeys.length,
-    emailCount: allEmails.length,
-    phoneCount: allPhones.length,
-    createdAt: now,
-    updatedAt: now,
-    importedAt: importedAtISO,
-    sourceFile,
-    version,
+    id: contactId, displayName, nameNormalized, primaryEmail, emailDomain,
+    allEmails, allDomains, primaryPhone, organization, photoUrl, categories, tags,
+    searchTokens, userDefinedKeys, hasUserDefined,
+    udKeyCount: userDefinedKeys.length, emailCount: allEmails.length,
+    phoneCount: allPhones.length, createdAt: now, updatedAt: now,
+    importedAt: importedAtISO, sourceFile, version,
   };
 
   if (!photoUrl) delete indexDoc.photoUrl;
@@ -134,18 +116,14 @@ function buildContactDocs(contactJson, options = {}) {
   const detailDoc = {
     id: contactId,
     contact: {
-      displayName,
-      name: contactData.name || null,
+      displayName, name: contactData.name || null,
       emails: (contactData.emails || allEmails.map(v => ({ type: ['INTERNET'], value: v }))),
       phones: (contactData.phones || allPhones.map(v => ({ type: ['VOICE'], value: v }))),
-      organization,
-      categories,
+      organization, categories,
     },
     userDefined,
     vcfRaw: contactJson.vcfRaw || contactData.vcfRaw || null,
-    createdAt: now,
-    updatedAt: now,
-    version,
+    createdAt: now, updatedAt: now, version,
   };
 
   if (!detailDoc.contact.name) delete detailDoc.contact.name;
@@ -158,9 +136,7 @@ function buildContactDocs(contactJson, options = {}) {
     return {
       docId: encodeDocId(email),
       data: {
-        email,
-        contactId,
-        isPrimary: idx === 0,
+        email, contactId, isPrimary: idx === 0,
         type: emailObj ? (emailObj.type || ['INTERNET']) : ['INTERNET'],
         label: emailObj ? (emailObj.label || null) : null,
       },
@@ -168,20 +144,10 @@ function buildContactDocs(contactJson, options = {}) {
   });
 
   const udKeyUpdates = userDefinedKeys.map(key => ({
-    docId: encodeDocId(key),
-    key,
-    contactId,
-    operation: 'add',
+    docId: encodeDocId(key), key, contactId, operation: 'add',
   }));
 
   return { contactId, indexDoc, detailDoc, emailLookupDocs, udKeyUpdates };
 }
 
-module.exports = {
-  buildContactDocs,
-  encodeDocId,
-  extractEmails,
-  extractPhones,
-  extractDisplayName,
-  extractUdKeys,
-};
+module.exports = { buildContactDocs, encodeDocId, extractEmails, extractPhones, extractDisplayName, extractUdKeys };

@@ -1,101 +1,90 @@
 'use strict';
 
 /**
- * middleware/auth.js — API Key authentication middleware
+ * auth.js — API Key authentication middleware
  *
  * Flow:
- *   1. Đọc header: Authorization: Bearer <key>
- *   2. SHA-256 hash key
- *   3. Lookup hash trong Realtime DB: /api_keys/{keyHash}
- *   4. Kiểm tra active status + optional expiry
- *   5. Attach keyData vào req.apiKey nếu hợp lệ
+ * 1. Đọc header: Authorization: Bearer <api-key>
+ * 2. SHA-256 hash key → lookup /api_keys/{keyHash} trong Realtime DB
+ * 3. Kiểm tra active flag + (optional) expiry
+ * 4. Attach keyInfo vào req.apiKey nếu hợp lệ
  *
- * Lưu ý: Admin SDK bypass Firestore rules → chỉ cần validate key là đủ
+ * Realtime DB schema:
+ * /api_keys/{keyHash}:
+ *   { name, active, createdAt, lastUsedAt, expiresAt? }
  */
 
 const crypto = require('crypto');
 const { getRtdb } = require('../utils/firebase-admin');
 
 /**
- * Hash API key bằng SHA-256 (hex)
- * @param {string} key
- * @returns {string}
+ * Hash API key bằng SHA-256
+ * @param {string} apiKey
+ * @returns {string} hex digest
  */
-function hashKey(key) {
-  return crypto.createHash('sha256').update(key).digest('hex');
+function hashApiKey(apiKey) {
+  return crypto.createHash('sha256').update(apiKey).digest('hex');
 }
 
 /**
- * Express middleware: xác thực API key
- * Attach req.apiKey = { hash, name, createdAt, ... } nếu hợp lệ
+ * Lookup key hash trong Realtime Database
+ * @param {string} keyHash
+ * @returns {Promise<object|null>}
+ */
+async function lookupApiKey(keyHash) {
+  const rtdb = getRtdb();
+  const snap = await rtdb.ref(`api_keys/${keyHash}`).once('value');
+  return snap.exists() ? snap.val() : null;
+}
+
+/**
+ * Express middleware — validate API key
+ * Gắn req.apiKey = { hash, name, ... } nếu hợp lệ
  */
 async function authMiddleware(req, res, next) {
-  const authHeader = req.headers['authorization'] || '';
+  const authHeader = req.headers['authorization'];
 
-  if (!authHeader.startsWith('Bearer ')) {
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({
       error: 'Unauthorized',
-      message: 'Missing Authorization header. Use: Bearer <api-key>',
+      message: 'Missing Authorization header. Use: Authorization: Bearer <api-key>',
     });
   }
 
-  const key = authHeader.slice(7).trim();
-  if (!key) {
-    return res.status(401).json({
-      error: 'Unauthorized',
-      message: 'Empty API key',
-    });
+  const apiKey = authHeader.slice(7).trim(); // bỏ "Bearer "
+  if (!apiKey) {
+    return res.status(401).json({ error: 'Unauthorized', message: 'Empty API key' });
   }
 
   try {
-    const keyHash = hashKey(key);
-    const rtdb = getRtdb();
-    const snap = await rtdb.ref(`api_keys/${keyHash}`).get();
+    const keyHash = hashApiKey(apiKey);
+    const keyInfo = await lookupApiKey(keyHash);
 
-    if (!snap.exists()) {
-      return res.status(401).json({
-        error: 'Unauthorized',
-        message: 'Invalid API key',
-      });
+    if (!keyInfo) {
+      return res.status(401).json({ error: 'Unauthorized', message: 'Invalid API key' });
     }
 
-    const keyData = snap.val();
-
-    // Kiểm tra active
-    if (keyData.active === false) {
-      return res.status(401).json({
-        error: 'Unauthorized',
-        message: 'API key has been revoked',
-      });
+    if (keyInfo.active === false) {
+      return res.status(403).json({ error: 'Forbidden', message: 'API key is disabled' });
     }
 
-    // Kiểm tra expiry (nếu có)
-    if (keyData.expiresAt) {
-      const expiry = new Date(keyData.expiresAt);
-      if (expiry < new Date()) {
-        return res.status(401).json({
-          error: 'Unauthorized',
-          message: 'API key has expired',
-        });
-      }
+    // Kiểm tra expiry nếu có
+    if (keyInfo.expiresAt && new Date(keyInfo.expiresAt) < new Date()) {
+      return res.status(403).json({ error: 'Forbidden', message: 'API key has expired' });
     }
 
-    // Attach keyData vào request
-    req.apiKey = { hash: keyHash, ...keyData };
-
-    // Cập nhật lastUsedAt (async, không block request)
-    rtdb.ref(`api_keys/${keyHash}/lastUsedAt`)
+    // Cập nhật lastUsedAt (non-blocking, không await)
+    getRtdb()
+      .ref(`api_keys/${keyHash}/lastUsedAt`)
       .set(new Date().toISOString())
-      .catch(() => {}); // silent fail
+      .catch(() => {}); // ignore errors để không block request
 
-    next();
+    req.apiKey = { hash: keyHash, ...keyInfo };
+    return next();
   } catch (err) {
-    console.error('[auth] Error validating API key:', err.message);
-    return res.status(500).json({
-      error: 'Internal Server Error',
-      message: 'Failed to validate API key',
-    });
+    console.error('[auth] Error validating API key:', err);
+    return res.status(500).json({ error: 'Internal Server Error', message: 'Auth check failed' });
   }
 }
 
-module.exports = { authMiddleware, hashKey };
+module.exports = { authMiddleware, hashApiKey };
